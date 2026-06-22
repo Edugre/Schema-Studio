@@ -1,0 +1,91 @@
+import type { InferredType } from "./types.js";
+
+export const TYPE_INFERENCE_THRESHOLD = 0.95;
+
+const BOOL_VALUES = new Set(["true", "false", "yes", "no", "t", "f"]);
+
+const INT_PATTERN = /^[+-]?\d+$/;
+
+const NUMERIC_PATTERN = /^[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?$/;
+
+const DATE_PATTERNS = [
+  /^\d{4}-\d{2}-\d{2}$/,
+  /^\d{4}\/\d{2}\/\d{2}$/,
+  /^\d{2}\/\d{2}\/\d{4}$/,
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})?$/,
+] as const;
+
+function isNonEmpty(value: string): boolean {
+  return value !== "";
+}
+
+function meetsThreshold(values: string[], matches: (value: string) => boolean): boolean {
+  if (values.length === 0) {
+    return false;
+  }
+  const matchCount = values.filter(matches).length;
+  return matchCount / values.length >= TYPE_INFERENCE_THRESHOLD;
+}
+
+function matchesBool(value: string): boolean {
+  return BOOL_VALUES.has(value.toLowerCase());
+}
+
+function matchesInt(value: string): boolean {
+  return INT_PATTERN.test(value);
+}
+
+function hasFractionalPart(value: string): boolean {
+  return value.includes(".");
+}
+
+function matchesNumeric(value: string): boolean {
+  return NUMERIC_PATTERN.test(value);
+}
+
+function matchesDate(value: string): boolean {
+  return DATE_PATTERNS.some((pattern) => pattern.test(value));
+}
+
+export type TypeInferenceRule = {
+  type: InferredType;
+  matches: (values: string[]) => boolean;
+};
+
+export const TYPE_INFERENCE_RULES: readonly TypeInferenceRule[] = [
+  {
+    type: "bool",
+    matches: (values) => meetsThreshold(values, matchesBool),
+  },
+  {
+    type: "int",
+    matches: (values) => meetsThreshold(values, matchesInt),
+  },
+  {
+    type: "numeric",
+    matches: (values) => values.some(hasFractionalPart) && meetsThreshold(values, matchesNumeric),
+  },
+  {
+    type: "date",
+    matches: (values) => meetsThreshold(values, matchesDate),
+  },
+  {
+    type: "text",
+    matches: () => true,
+  },
+];
+
+export function inferType(values: string[]): InferredType {
+  const nonEmpty = values.filter(isNonEmpty);
+  if (nonEmpty.length === 0) {
+    return "text";
+  }
+
+  for (const rule of TYPE_INFERENCE_RULES) {
+    if (rule.matches(nonEmpty)) {
+      return rule.type;
+    }
+  }
+
+  return "text";
+}

@@ -108,11 +108,9 @@ describe("applyActions", () => {
     it("rejects a missing table", () => {
       const makeId = makeTestIds();
       const schema = emptySchema();
-      const result = applyActions(
-        schema,
-        [{ op: "add_field", table: "missing", name: "foo" }],
-        { makeId },
-      );
+      const result = applyActions(schema, [{ op: "add_field", table: "missing", name: "foo" }], {
+        makeId,
+      });
 
       expect(result.schema).toEqual(schema);
       expect(result.rejected[0]?.reason).toBe("table 'missing' not found");
@@ -121,16 +119,12 @@ describe("applyActions", () => {
     it("rejects duplicate field names in the same table", () => {
       const makeId = makeTestIds();
       const schema = seedSchema(makeId);
-      const result = applyActions(
-        schema,
-        [{ op: "add_field", table: "users", name: "ID" }],
-        { makeId },
-      );
+      const result = applyActions(schema, [{ op: "add_field", table: "users", name: "ID" }], {
+        makeId,
+      });
 
       expect(result.schema).toEqual(schema);
-      expect(result.rejected[0]?.reason).toBe(
-        "field 'ID' already exists in table 'users'",
-      );
+      expect(result.rejected[0]?.reason).toBe("field 'ID' already exists in table 'users'");
     });
   });
 
@@ -194,9 +188,7 @@ describe("applyActions", () => {
         ],
         { makeId },
       );
-      expect(missingField.rejected[0]?.reason).toBe(
-        "field 'missing' not found in table 'posts'",
-      );
+      expect(missingField.rejected[0]?.reason).toBe("field 'missing' not found in table 'posts'");
     });
 
     it("rejects invalid cardinality at validation", () => {
@@ -295,9 +287,7 @@ describe("applyActions", () => {
       );
 
       expect(result.schema).toEqual(schema);
-      expect(result.rejected[0]?.reason).toBe(
-        "field 'ghost' not found in table 'posts'",
-      );
+      expect(result.rejected[0]?.reason).toBe("field 'ghost' not found in table 'posts'");
     });
   });
 

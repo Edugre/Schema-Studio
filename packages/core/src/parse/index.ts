@@ -1,63 +1,65 @@
-import Papa from "papaparse";
-import * as XLSX from "xlsx";
+export { ParseError } from "./errors.js";
+export {
+  TYPE_INFERENCE_RULES,
+  TYPE_INFERENCE_THRESHOLD,
+  inferType,
+  type TypeInferenceRule,
+} from "./infer.js";
+export {
+  MAX_INFERENCE_VALUES,
+  MAX_SAMPLES,
+  MAX_SCAN_ROWS,
+  collectInferenceValues,
+  collectSamples,
+} from "./sample.js";
+export {
+  InferredTypeSchema,
+  SourceFieldSchema,
+  SourceKindSchema,
+  SourceSchema,
+  type InferredType,
+  type Source,
+  type SourceField,
+  type SourceKind,
+} from "./types.js";
+export { defaultMakeId, dedupeNames, type ParseOptions } from "./util.js";
+export { parseCsv } from "./csv.js";
+export { parseJson } from "./json.js";
+export { parseXlsx } from "./xlsx.js";
 
-export type ParsedSource = {
-  name: string;
-  columns: string[];
-  rows: Record<string, unknown>[];
-};
+import type { SourceKind } from "./types.js";
+import { parseCsv } from "./csv.js";
+import { parseJson } from "./json.js";
+import { parseXlsx } from "./xlsx.js";
+import type { ParseOptions } from "./util.js";
+import type { Source } from "./types.js";
 
-export function parseCsv(content: string, name: string): ParsedSource {
-  const result = Papa.parse<Record<string, unknown>>(content, {
-    header: true,
-    skipEmptyLines: true,
-  });
+/** @deprecated Use Source */
+export type ParsedSource = Source;
 
-  const columns = result.meta.fields ?? [];
-
-  return {
-    name,
-    columns,
-    rows: result.data,
-  };
-}
-
-export function parseXlsx(buffer: ArrayBuffer, name: string): ParsedSource {
-  const workbook = XLSX.read(buffer, { type: "array" });
-  const firstSheetName = workbook.SheetNames[0];
-
-  if (!firstSheetName) {
-    return { name, columns: [], rows: [] };
+export function parseSource(
+  input: {
+    name: string;
+    kind: SourceKind;
+    content: string | ArrayBuffer | Uint8Array;
+  },
+  opts?: ParseOptions,
+): Source {
+  switch (input.kind) {
+    case "csv":
+      if (typeof input.content !== "string") {
+        throw new Error("CSV content must be a string");
+      }
+      return parseCsv(input.content, input.name, opts);
+    case "json":
+      if (typeof input.content !== "string") {
+        throw new Error("JSON content must be a string");
+      }
+      return parseJson(input.content, input.name, opts);
+    case "xlsx":
+      if (typeof input.content === "string") {
+        throw new Error("XLSX content must be an ArrayBuffer or Uint8Array");
+      }
+      return parseXlsx(input.content, input.name, opts);
   }
-
-  const sheet = workbook.Sheets[firstSheetName];
-
-  if (!sheet) {
-    return { name, columns: [], rows: [] };
-  }
-
-  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);
-  const columns = rows[0] ? Object.keys(rows[0]) : [];
-
-  return { name, columns, rows };
-}
-
-export function parseJson(content: string, name: string): ParsedSource {
-  const parsed: unknown = JSON.parse(content);
-
-  if (Array.isArray(parsed)) {
-    const rows = parsed.filter(
-      (row): row is Record<string, unknown> => typeof row === "object" && row !== null,
-    );
-    const columns = rows[0] ? Object.keys(rows[0]) : [];
-
-    return { name, columns, rows };
-  }
-
-  if (typeof parsed === "object" && parsed !== null) {
-    const rows = [parsed as Record<string, unknown>];
-    return { name, columns: Object.keys(parsed as Record<string, unknown>), rows };
-  }
-
-  return { name, columns: [], rows: [] };
 }

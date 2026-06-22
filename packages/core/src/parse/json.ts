@@ -1,0 +1,151 @@
+import { ParseError } from "./errors.js";
+import type { Source } from "./types.js";
+import { buildSourceField, dedupeNames, resolveMakeId, type ParseOptions } from "./util.js";
+import { MAX_SCAN_ROWS } from "./sample.js";
+
+const MAX_KEY_SCAN_RECORDS = 200;
+const MAX_FLATTEN_DEPTH = 2;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function scalarToString(value: unknown): string {
+  if (value === null || value === undefined) {
+    return "";
+  }
+  return String(value);
+}
+
+function pathSegmentCount(path: string): number {
+  return path === "" ? 0 : path.split(".").length;
+}
+
+function flattenValue(
+  value: unknown,
+  path: string,
+  out: Map<string, string[]>,
+  order: string[],
+): void {
+  if (Array.isArray(value)) {
+    const stringified = JSON.stringify(value);
+    appendFieldValue(out, order, path, stringified);
+    return;
+  }
+
+  if (isRecord(value)) {
+    if (pathSegmentCount(path) >= MAX_FLATTEN_DEPTH) {
+      appendFieldValue(out, order, path, JSON.stringify(value));
+      return;
+    }
+
+    for (const [key, nestedValue] of Object.entries(value)) {
+      const nestedPath = path === "" ? key : `${path}.${key}`;
+      flattenValue(nestedValue, nestedPath, out, order);
+    }
+    return;
+  }
+
+  appendFieldValue(out, order, path, scalarToString(value));
+}
+
+function appendFieldValue(
+  out: Map<string, string[]>,
+  order: string[],
+  path: string,
+  value: string,
+): void {
+  if (!out.has(path)) {
+    out.set(path, []);
+    order.push(path);
+  }
+  out.get(path)?.push(value);
+}
+
+function unionFieldKeys(records: Record<string, unknown>[]): string[] {
+  const order: string[] = [];
+  const seen = new Set<string>();
+  const limit = Math.min(records.length, MAX_KEY_SCAN_RECORDS);
+
+  for (let i = 0; i < limit; i++) {
+    const record = records[i];
+    if (!record) {
+      continue;
+    }
+    const fieldOrder: string[] = [];
+    const values = new Map<string, string[]>();
+    flattenValue(record, "", values, fieldOrder);
+    for (const key of fieldOrder) {
+      if (!seen.has(key)) {
+        seen.add(key);
+        order.push(key);
+      }
+    }
+  }
+
+  return order;
+}
+
+function recordFieldValues(record: Record<string, unknown>): Map<string, string> {
+  const order: string[] = [];
+  const values = new Map<string, string[]>();
+  flattenValue(record, "", values, order);
+
+  const flattened = new Map<string, string>();
+  for (const key of order) {
+    const fieldValues = values.get(key) ?? [];
+    flattened.set(key, fieldValues[0] ?? "");
+  }
+  return flattened;
+}
+
+export function parseJson(input: string, name: string, opts?: ParseOptions): Source {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(input);
+  } catch {
+    throw new ParseError(`Unable to parse JSON in "${name}"`);
+  }
+
+  let records: Record<string, unknown>[];
+  if (Array.isArray(parsed)) {
+    records = parsed.filter(isRecord);
+  } else if (isRecord(parsed)) {
+    records = [parsed];
+  } else {
+    records = [];
+  }
+
+  const scanRecords = records.slice(0, MAX_SCAN_ROWS);
+  const keyOrder = unionFieldKeys(scanRecords);
+  const dedupedNames = dedupeNames(keyOrder);
+
+  const columnValues = new Map<string, string[]>();
+  for (const name of keyOrder) {
+    columnValues.set(name, []);
+  }
+
+  for (const record of scanRecords) {
+    const flattened = recordFieldValues(record);
+    for (const key of keyOrder) {
+      const values = columnValues.get(key);
+      if (!values) {
+        continue;
+      }
+      values.push(flattened.get(key) ?? "");
+    }
+  }
+
+  const fields = dedupedNames.map((fieldName, index) => {
+    const originalKey = keyOrder[index] ?? fieldName;
+    const values = columnValues.get(originalKey) ?? [];
+    return buildSourceField(values, fieldName);
+  });
+
+  return {
+    id: resolveMakeId(opts)(),
+    name,
+    kind: "json",
+    fields,
+  };
+}

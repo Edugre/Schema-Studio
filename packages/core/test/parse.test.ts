@@ -1,20 +1,244 @@
+import * as XLSX from "xlsx";
 import { describe, expect, it } from "vitest";
 
-import { parseCsv, parseJson } from "../src/parse/index.js";
+import {
+  TYPE_INFERENCE_RULES,
+  TYPE_INFERENCE_THRESHOLD,
+  ParseError,
+  collectSamples,
+  inferType,
+  parseCsv,
+  parseJson,
+  parseSource,
+  parseXlsx,
+} from "../src/parse/index.js";
 
-describe("parse", () => {
-  it("parses CSV content into columns and rows", () => {
-    const result = parseCsv("id,name\n1,Alice", "users.csv");
+function makeTestIds(prefix = "test-id"): () => string {
+  let counter = 0;
+  return () => `${prefix}-${++counter}`;
+}
 
-    expect(result.name).toBe("users.csv");
-    expect(result.columns).toEqual(["id", "name"]);
-    expect(result.rows).toHaveLength(1);
+describe("inferType", () => {
+  it("exports a table-driven rule list ending in text fallback", () => {
+    expect(TYPE_INFERENCE_THRESHOLD).toBe(0.95);
+    expect(TYPE_INFERENCE_RULES.map((rule) => rule.type)).toEqual([
+      "bool",
+      "int",
+      "numeric",
+      "date",
+      "text",
+    ]);
+    expect(TYPE_INFERENCE_RULES.at(-1)?.matches([])).toBe(true);
   });
 
-  it("parses JSON array content", () => {
-    const result = parseJson('[{"id":1,"name":"Alice"}]', "users.json");
+  it("infers int for integer columns", () => {
+    expect(inferType(["1", "42", "-7", "0"])).toBe("int");
+  });
 
-    expect(result.columns).toEqual(["id", "name"]);
-    expect(result.rows).toHaveLength(1);
+  it("infers numeric when decimals are present", () => {
+    expect(inferType(["1.5", "2.0", "3.25"])).toBe("numeric");
+    expect(inferType(["1", "2.5", "3"])).toBe("numeric");
+  });
+
+  it("infers bool for true/false and yes/no", () => {
+    expect(inferType(["true", "false", "True", "FALSE"])).toBe("bool");
+    expect(inferType(["yes", "no", "YES", "No"])).toBe("bool");
+    expect(inferType(["t", "f", "T", "F"])).toBe("bool");
+  });
+
+  it("treats 0/1 columns as int, not bool", () => {
+    expect(inferType(["0", "1", "0", "1"])).toBe("int");
+  });
+
+  it("infers date for accepted formats", () => {
+    expect(inferType(["2024-01-15", "2024-02-20"])).toBe("date");
+    expect(inferType(["2024/01/15", "2024/02/20"])).toBe("date");
+    expect(inferType(["01/15/2024", "02/20/2024"])).toBe("date");
+    expect(inferType(["2024-01-15T10:30:00Z", "2024-02-20T08:00:00+00:00"])).toBe("date");
+  });
+
+  it("falls back to text when fewer than 95% of values match", () => {
+    const values = Array.from({ length: 100 }, (_, index) => (index < 94 ? "1" : "maybe"));
+    expect(inferType(values)).toBe("text");
+  });
+
+  it("returns text for all-empty columns", () => {
+    expect(inferType(["", "", ""])).toBe("text");
+  });
+});
+
+describe("collectSamples", () => {
+  it("keeps distinct samples in first-seen order, capped at 5", () => {
+    expect(collectSamples(["a", "b", "a", "c", "d", "e", "f", "g"])).toEqual([
+      "a",
+      "b",
+      "c",
+      "d",
+      "e",
+    ]);
+  });
+
+  it("preserves leading zeros and grant codes verbatim", () => {
+    expect(collectSamples(["00123", "00123", "H80CS00123"])).toEqual(["00123", "H80CS00123"]);
+  });
+
+  it("excludes empty cells", () => {
+    expect(collectSamples(["", "alpha", "", "beta"])).toEqual(["alpha", "beta"]);
+  });
+});
+
+describe("parseCsv", () => {
+  const opts = { makeId: makeTestIds("csv") };
+
+  it("preserves header order and reads rows positionally", () => {
+    const source = parseCsv("z_col,a_col,m_col\n3,1,2\n", "ordered.csv", opts);
+
+    expect(source.fields.map((field) => field.name)).toEqual(["z_col", "a_col", "m_col"]);
+    expect(source.fields[0]?.samples).toEqual(["3"]);
+    expect(source.fields[1]?.samples).toEqual(["1"]);
+    expect(source.fields[2]?.samples).toEqual(["2"]);
+  });
+
+  it("dedupes duplicate headers deterministically", () => {
+    const source = parseCsv("name,name,name\na,b,c\n", "dupes.csv", opts);
+
+    expect(source.fields.map((field) => field.name)).toEqual(["name", "name_2", "name_3"]);
+    expect(source.fields[0]?.samples).toEqual(["a"]);
+    expect(source.fields[1]?.samples).toEqual(["b"]);
+    expect(source.fields[2]?.samples).toEqual(["c"]);
+  });
+
+  it("infers int and date column types", () => {
+    const source = parseCsv("id,started\n42,2024-01-15\n7,2024-02-01\n", "types.csv", opts);
+
+    expect(source.fields[0]?.type).toBe("int");
+    expect(source.fields[1]?.type).toBe("date");
+  });
+
+  it("uses injected makeId for Source id", () => {
+    const source = parseCsv("x\n1\n", "id.csv", { makeId: makeTestIds("csv-id") });
+    expect(source.id).toBe("csv-id-1");
+  });
+});
+
+describe("parseXlsx", () => {
+  const opts = { makeId: makeTestIds("xlsx") };
+
+  function workbookBuffer(sheets: Record<string, string[][]>): ArrayBuffer {
+    const workbook = XLSX.utils.book_new();
+    for (const [sheetName, rows] of Object.entries(sheets)) {
+      const sheet = XLSX.utils.aoa_to_sheet(rows);
+      XLSX.utils.book_append_sheet(workbook, sheet, sheetName);
+    }
+    return XLSX.write(workbook, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+  }
+
+  it("prefixes field names when multiple non-empty sheets exist", () => {
+    const buffer = workbookBuffer({
+      People: [
+        ["id", "name"],
+        ["1", "Ada"],
+      ],
+      Places: [
+        ["id", "city"],
+        ["10", "Paris"],
+      ],
+      Empty: [
+        ["", ""],
+        ["", ""],
+      ],
+    });
+
+    const source = parseXlsx(buffer, "multi.xlsx", opts);
+    const names = source.fields.map((field) => field.name);
+
+    expect(names).toEqual(["People.id", "People.name", "Places.id", "Places.city"]);
+    expect(source.fields[0]?.samples).toEqual(["1"]);
+    expect(source.fields[3]?.samples).toEqual(["Paris"]);
+  });
+
+  it("does not prefix field names for a single non-empty sheet", () => {
+    const buffer = workbookBuffer({
+      Only: [
+        ["id", "name"],
+        ["1", "Ada"],
+      ],
+      Empty: [],
+    });
+
+    const source = parseXlsx(buffer, "single.xlsx", opts);
+
+    expect(source.fields.map((field) => field.name)).toEqual(["id", "name"]);
+  });
+
+  it("uses injected makeId for Source id", () => {
+    const buffer = workbookBuffer({ Sheet1: [["a"], ["1"]] });
+    const source = parseXlsx(buffer, "id.xlsx", { makeId: makeTestIds("xlsx-id") });
+    expect(source.id).toBe("xlsx-id-1");
+  });
+});
+
+describe("parseJson", () => {
+  const opts = { makeId: makeTestIds("json") };
+
+  it("unions keys across array records in first-seen order", () => {
+    const source = parseJson('[{"b":2,"a":1},{"c":3,"a":9}]', "array.json", opts);
+
+    expect(source.fields.map((field) => field.name)).toEqual(["b", "a", "c"]);
+  });
+
+  it("flattens nested objects to depth 2", () => {
+    const source = parseJson(
+      '{"name":"Ada","address":{"city":"Paris","geo":{"lat":1}}}',
+      "nested.json",
+      opts,
+    );
+
+    const byName = Object.fromEntries(source.fields.map((field) => [field.name, field]));
+    expect(byName.name?.samples).toEqual(["Ada"]);
+    expect(byName["address.city"]?.samples).toEqual(["Paris"]);
+    expect(byName["address.geo"]?.samples).toEqual(['{"lat":1}']);
+  });
+
+  it("stores array values as a single stringified field", () => {
+    const source = parseJson('{"tags":["a","b"]}', "arrays.json", opts);
+    expect(source.fields[0]).toEqual({
+      name: "tags",
+      type: "text",
+      samples: ['["a","b"]'],
+    });
+  });
+
+  it("wraps a single top-level object as one record", () => {
+    const source = parseJson('{"id":1,"name":"Ada"}', "object.json", opts);
+    expect(source.fields).toHaveLength(2);
+    expect(source.fields[0]?.samples).toEqual(["1"]);
+  });
+
+  it("throws ParseError for malformed JSON", () => {
+    expect(() => parseJson("{not json", "bad.json", opts)).toThrow(ParseError);
+  });
+
+  it("uses injected makeId for Source id", () => {
+    const source = parseJson("{}", "id.json", { makeId: makeTestIds("json-id") });
+    expect(source.id).toBe("json-id-1");
+  });
+});
+
+describe("parseSource", () => {
+  it("dispatches by kind", () => {
+    const csv = parseSource({
+      name: "a.csv",
+      kind: "csv",
+      content: "x\n1\n",
+    });
+    expect(csv.kind).toBe("csv");
+
+    const json = parseSource({
+      name: "a.json",
+      kind: "json",
+      content: "{}",
+    });
+    expect(json.kind).toBe("json");
   });
 });

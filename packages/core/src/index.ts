@@ -2,13 +2,7 @@ export type { ApplyActionsOptions, ApplyResult, SchemaAction } from "./actions.j
 export { SchemaActionSchema, applyActions } from "./actions.js";
 export type { AiProvider, AiProviderResult } from "./ai/provider.js";
 export { toDbml, toPrisma, toSql } from "./export/index.js";
-export type {
-  Cardinality,
-  Field,
-  Relationship,
-  Schema,
-  Table,
-} from "./model.js";
+export type { Cardinality, Field, Relationship, Schema, Table } from "./model.js";
 export {
   CardinalitySchema,
   FieldSchema,
@@ -17,5 +11,31 @@ export {
   TableSchema,
   emptySchema,
 } from "./model.js";
-export type { ParsedSource } from "./parse/index.js";
-export { parseCsv, parseJson, parseXlsx } from "./parse/index.js";
+export type {
+  InferredType,
+  ParsedSource,
+  Source,
+  SourceField,
+  SourceKind,
+  TypeInferenceRule,
+  ParseOptions,
+} from "./parse/index.js";
+export {
+  InferredTypeSchema,
+  MAX_INFERENCE_VALUES,
+  MAX_SAMPLES,
+  MAX_SCAN_ROWS,
+  ParseError,
+  SourceFieldSchema,
+  SourceKindSchema,
+  SourceSchema,
+  TYPE_INFERENCE_RULES,
+  TYPE_INFERENCE_THRESHOLD,
+  collectInferenceValues,
+  collectSamples,
+  inferType,
+  parseCsv,
+  parseJson,
+  parseSource,
+  parseXlsx,
+} from "./parse/index.js";

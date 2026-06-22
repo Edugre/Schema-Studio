@@ -1,0 +1,43 @@
+export const MAX_SCAN_ROWS = 1000;
+export const MAX_INFERENCE_VALUES = 200;
+export const MAX_SAMPLES = 5;
+
+function isNonEmpty(value: string | null | undefined): value is string {
+  return value !== null && value !== undefined && value !== "";
+}
+
+/** Collect up to 5 distinct non-empty samples in first-seen order. */
+export function collectSamples(values: string[]): string[] {
+  const samples: string[] = [];
+  const seen = new Set<string>();
+  const limit = Math.min(values.length, MAX_SCAN_ROWS);
+
+  for (let i = 0; i < limit; i++) {
+    const value = values[i];
+    if (!isNonEmpty(value) || seen.has(value)) {
+      continue;
+    }
+    seen.add(value);
+    samples.push(value);
+    if (samples.length >= MAX_SAMPLES) {
+      break;
+    }
+  }
+
+  return samples;
+}
+
+/** First ~200 non-empty values for type inference. */
+export function collectInferenceValues(values: string[]): string[] {
+  const result: string[] = [];
+  const limit = Math.min(values.length, MAX_SCAN_ROWS);
+
+  for (let i = 0; i < limit && result.length < MAX_INFERENCE_VALUES; i++) {
+    const value = values[i];
+    if (isNonEmpty(value)) {
+      result.push(value);
+    }
+  }
+
+  return result;
+}

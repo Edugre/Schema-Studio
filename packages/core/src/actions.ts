@@ -1,11 +1,6 @@
 import { z } from "zod";
 
-import {
-  CardinalitySchema,
-  type Field,
-  type Schema,
-  type Table,
-} from "./model.js";
+import { CardinalitySchema, type Field, type Schema, type Table } from "./model.js";
 
 const fieldInputSchema = z.object({
   name: z.string(),
@@ -125,11 +120,7 @@ function removeRelationshipsForTable(schema: Schema, tableId: string): void {
   );
 }
 
-function removeRelationshipsForField(
-  schema: Schema,
-  tableId: string,
-  fieldId: string,
-): void {
+function removeRelationshipsForField(schema: Schema, tableId: string, fieldId: string): void {
   schema.relationships = schema.relationships.filter(
     (relationship) =>
       !(
@@ -348,15 +339,7 @@ export function applyActions(
           break;
         }
 
-        if (
-          relationshipExists(
-            working,
-            fromTable.id,
-            fromField.id,
-            toTable.id,
-            toField.id,
-          )
-        ) {
+        if (relationshipExists(working, fromTable.id, fromField.id, toTable.id, toField.id)) {
           rejected.push({
             action: rawAction,
             reason: "relationship already exists",
