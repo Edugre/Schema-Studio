@@ -1,52 +1,10 @@
-import type { Node, NodeProps } from "@xyflow/react";
-import { Background, Controls, MiniMap, ReactFlow } from "@xyflow/react";
-import "@xyflow/react/dist/style.css";
 import { useMemo, useState } from "react";
 
 import type { AiProvider } from "@schema-studio/core";
 
 import { AnthropicBrowserProvider } from "./ai/AnthropicBrowserProvider";
 import "./App.css";
-
-type TableNodeData = {
-  label: string;
-  fields: Array<{ name: string; type: string }>;
-};
-
-type TableNode = Node<TableNodeData, "table">;
-
-function TableNodeComponent({ data }: NodeProps<TableNode>) {
-  return (
-    <div className="table-node">
-      <div className="table-node__title">{data.label}</div>
-      {data.fields.map((field) => (
-        <div key={field.name} className="table-node__field">
-          <span>{field.name}</span>
-          <span className="table-node__type">{field.type}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-const nodeTypes = {
-  table: TableNodeComponent,
-};
-
-const initialNodes: TableNode[] = [
-  {
-    id: "users",
-    type: "table",
-    position: { x: 120, y: 80 },
-    data: {
-      label: "users",
-      fields: [
-        { name: "id", type: "uuid" },
-        { name: "email", type: "text" },
-      ],
-    },
-  },
-];
+import { CanvasPanel } from "./canvas/index.js";
 
 function SourcesPanel() {
   return (
@@ -56,23 +14,6 @@ function SourcesPanel() {
         <p className="sources-placeholder">
           Drop CSV, Excel, or JSON files here. Parsing will be wired up in a later task.
         </p>
-      </div>
-    </section>
-  );
-}
-
-function CanvasPanel() {
-  const nodes = useMemo(() => initialNodes, []);
-
-  return (
-    <section className="panel canvas-panel">
-      <header className="panel-header">Canvas</header>
-      <div className="panel-body">
-        <ReactFlow className="schema-canvas" nodes={nodes} edges={[]} nodeTypes={nodeTypes} fitView>
-          <Background />
-          <Controls />
-          <MiniMap />
-        </ReactFlow>
       </div>
     </section>
   );
