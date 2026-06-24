@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { AnthropicBrowserProvider } from "../ai/AnthropicBrowserProvider.js";
 import { useSchemaStore } from "../store/index.js";
 import "./CopilotPanel.css";
+import { Markdown } from "./Markdown.js";
 import {
   collectAffectedTableIds,
   formatRejectedAction,
@@ -157,7 +158,7 @@ export function CopilotPanel() {
               return (
                 <div key={message.id} className="copilot-message copilot-message--assistant">
                   <span className="copilot-message__label">Copilot</span>
-                  {message.text}
+                  <Markdown>{message.text}</Markdown>
                   {message.applied ? (
                     <div className="copilot-applied">
                       <strong>Applied to canvas</strong>

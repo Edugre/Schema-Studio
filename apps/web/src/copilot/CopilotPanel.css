@@ -114,6 +114,85 @@
   color: #9aa3b2;
 }
 
+.copilot-markdown {
+  /* Markdown produces its own block elements, so opt this subtree out of the
+     message's pre-wrap to avoid doubled blank lines between blocks. */
+  white-space: normal;
+}
+
+.copilot-markdown > :first-child {
+  margin-top: 0;
+}
+
+.copilot-markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.copilot-markdown p {
+  margin: 0 0 8px;
+}
+
+.copilot-markdown ul,
+.copilot-markdown ol {
+  margin: 0 0 8px;
+  padding-left: 18px;
+}
+
+.copilot-markdown li {
+  margin: 2px 0;
+}
+
+.copilot-markdown h1,
+.copilot-markdown h2,
+.copilot-markdown h3,
+.copilot-markdown h4 {
+  margin: 12px 0 6px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #e8eaed;
+}
+
+.copilot-markdown a {
+  color: #5b8def;
+}
+
+.copilot-markdown code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8rem;
+  background: #0f1117;
+  border: 1px solid #2a2f3a;
+  border-radius: 4px;
+  padding: 1px 4px;
+}
+
+.copilot-markdown pre {
+  margin: 0 0 8px;
+  padding: 10px 12px;
+  background: #0f1117;
+  border: 1px solid #2a2f3a;
+  border-radius: 6px;
+  overflow-x: auto;
+}
+
+.copilot-markdown pre code {
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.copilot-markdown table {
+  border-collapse: collapse;
+  margin: 0 0 8px;
+  font-size: 0.8rem;
+}
+
+.copilot-markdown th,
+.copilot-markdown td {
+  border: 1px solid #2a2f3a;
+  padding: 4px 8px;
+  text-align: left;
+}
+
 .copilot-applied {
   margin-top: 10px;
   padding: 8px 10px;
