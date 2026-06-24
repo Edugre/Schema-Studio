@@ -9,6 +9,7 @@ export type {
   JoinKeyCandidate,
 } from "./detect/index.js";
 export { detectFormatMismatch, detectJoinKeys } from "./detect/index.js";
+export type { SqlDialect } from "./export/index.js";
 export { toDbml, toPrisma, toSql } from "./export/index.js";
 export type { Cardinality, Field, Relationship, Schema, Table } from "./model.js";
 export {
