@@ -2,6 +2,7 @@ import { ParseError } from "@schema-studio/core";
 import { useCallback, useRef, useState, type ReactNode } from "react";
 
 import { useSchemaStore } from "../store/index.js";
+import { JoinSuggestions } from "../suggest/index.js";
 import { addSourceFieldToTable, buildTableFromSource, formatSample } from "./buildFromSource.js";
 import "./SourcesPanel.css";
 import { readAndParseFile } from "./readAndParse.js";
@@ -317,6 +318,8 @@ export function SourcesPanel() {
             </SourceCard>
           ))
         )}
+
+        <JoinSuggestions />
       </div>
     </section>
   );
