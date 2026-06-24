@@ -44,30 +44,9 @@
   padding: 0;
 }
 
-.sources-placeholder,
-.copilot-placeholder {
+.sources-placeholder {
   color: #9aa3b2;
   font-size: 0.9rem;
-}
-
-.copilot-key {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-
-.copilot-key label {
-  font-size: 0.8rem;
-  color: #9aa3b2;
-}
-
-.copilot-key input {
-  padding: 8px 10px;
-  border-radius: 6px;
-  border: 1px solid #2a2f3a;
-  background: #0f1117;
-  color: #e8eaed;
 }
 
 .schema-canvas {

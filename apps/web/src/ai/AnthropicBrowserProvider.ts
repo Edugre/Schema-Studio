@@ -1,8 +1,11 @@
 import type { AiProvider, AiProviderResult, ParsedSource, Schema } from "@schema-studio/core";
 
+import { buildCopilotSystemPrompt } from "../copilot/systemPrompt.js";
+import { parseCopilotResponse } from "../copilot/parseResponse.js";
+
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
-const DEFAULT_MODEL = "claude-sonnet-4-20250514";
+const DEFAULT_MODEL = "claude-sonnet-4-6";
 
 type AnthropicMessageResponse = {
   content: Array<{ type: string; text?: string }>;
@@ -16,13 +19,7 @@ export class AnthropicBrowserProvider implements AiProvider {
     sources: ParsedSource[],
     message: string,
   ): Promise<AiProviderResult> {
-    const systemPrompt = [
-      "You are Schema Studio's schema design copilot.",
-      "Respond with concise guidance about relational schema design.",
-      "Do not emit structured actions in this scaffold — reply in plain text only.",
-      `Current schema: ${JSON.stringify(schema)}`,
-      `Sources: ${JSON.stringify(sources)}`,
-    ].join("\n");
+    const systemPrompt = buildCopilotSystemPrompt(schema, sources);
 
     const response = await fetch(ANTHROPIC_API_URL, {
       method: "POST",
@@ -34,7 +31,7 @@ export class AnthropicBrowserProvider implements AiProvider {
       },
       body: JSON.stringify({
         model: DEFAULT_MODEL,
-        max_tokens: 1024,
+        max_tokens: 4096,
         system: systemPrompt,
         messages: [{ role: "user", content: message }],
       }),
@@ -46,10 +43,18 @@ export class AnthropicBrowserProvider implements AiProvider {
     }
 
     const data = (await response.json()) as AnthropicMessageResponse;
-    const reply =
+    const rawText =
       data.content.find((block) => block.type === "text" && block.text)?.text ??
       "No response text returned.";
 
-    return { reply, actions: [] };
+    const parsed = parseCopilotResponse(rawText);
+    if ("error" in parsed) {
+      return {
+        reply: `${rawText}\n\n(${parsed.error})`,
+        actions: [],
+      };
+    }
+
+    return parsed;
   }
 }
