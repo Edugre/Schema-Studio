@@ -10,37 +10,12 @@ import {
   formatRejectedAction,
   summarizeAppliedActions,
 } from "./formatActions.js";
-
-type UserMessage = {
-  id: string;
-  role: "user";
-  text: string;
-};
-
-type AssistantMessage = {
-  id: string;
-  role: "assistant";
-  text: string;
-  applied?: string[];
-  rejected?: string[];
-};
-
-type ErrorMessage = {
-  id: string;
-  role: "error";
-  text: string;
-};
-
-type ChatMessage = UserMessage | AssistantMessage | ErrorMessage;
-
-function nextMessageId(): string {
-  return `msg-${crypto.randomUUID()}`;
-}
+import { type ChatMessage, nextMessageId } from "./messages.js";
+import { useApiKey } from "./useApiKey.js";
 
 export function CopilotPanel() {
-  const [apiKey, setApiKey] = useState("");
+  const { apiKey, remember, setApiKey, setRemember } = useApiKey();
   const [draft, setDraft] = useState("");
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [busy, setBusy] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -48,6 +23,8 @@ export function CopilotPanel() {
   const sources = useSchemaStore((state) => state.sources);
   const runActions = useSchemaStore((state) => state.runActions);
   const selectTable = useSchemaStore((state) => state.selectTable);
+  const messages = useSchemaStore((state) => state.chat);
+  const appendChatMessages = useSchemaStore((state) => state.appendChatMessages);
 
   const provider = useMemo((): AiProvider | null => {
     const trimmed = apiKey.trim();
@@ -70,7 +47,7 @@ export function CopilotPanel() {
     }
 
     setDraft("");
-    setMessages((prev) => [...prev, { id: nextMessageId(), role: "user", text }]);
+    appendChatMessages([{ id: nextMessageId(), role: "user", text }]);
     setBusy(true);
     scrollToBottom();
 
@@ -91,20 +68,18 @@ export function CopilotPanel() {
           ? rejected.map((entry) => formatRejectedAction(entry.action, entry.reason))
           : undefined;
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: nextMessageId(),
-          role: "assistant",
-          text: reply || "(No reply text returned.)",
-          ...(appliedSummary ? { applied: appliedSummary } : {}),
-          ...(rejectedSummary ? { rejected: rejectedSummary } : {}),
-        },
-      ]);
+      const assistantMessage: ChatMessage = {
+        id: nextMessageId(),
+        role: "assistant",
+        text: reply || "(No reply text returned.)",
+        ...(appliedSummary ? { applied: appliedSummary } : {}),
+        ...(rejectedSummary ? { rejected: rejectedSummary } : {}),
+      };
+      appendChatMessages([assistantMessage]);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Something went wrong talking to the copilot.";
-      setMessages((prev) => [...prev, { id: nextMessageId(), role: "error", text: message }]);
+      appendChatMessages([{ id: nextMessageId(), role: "error", text: message }]);
     } finally {
       setBusy(false);
       scrollToBottom();
@@ -125,12 +100,26 @@ export function CopilotPanel() {
             onChange={(event) => setApiKey(event.target.value)}
             autoComplete="off"
           />
+          <label className="copilot-key__remember">
+            <input
+              type="checkbox"
+              checked={remember}
+              onChange={(event) => setRemember(event.target.checked)}
+            />
+            Remember key on this device
+          </label>
+          {remember ? (
+            <p className="copilot-key__warning">
+              Stored unencrypted in this browser. Anyone with access to this device can read it. It
+              is never included when you export or share a project.
+            </p>
+          ) : null}
         </div>
 
         {!provider ? (
           <p className="copilot-placeholder">
             Enter an API key to enable the copilot. The canvas works without it — your key stays in
-            memory and is never saved.
+            memory unless you choose to remember it on this device.
           </p>
         ) : null}
 

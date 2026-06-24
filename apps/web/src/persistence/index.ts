@@ -13,6 +13,7 @@ export {
 } from "./projectStore.js";
 export { parseProjectFile, serializeProjectFile, toProjectFile } from "./serialize.js";
 export type { ParseProjectResult } from "./serialize.js";
+export { clearStoredApiKey, getStoredApiKey, setStoredApiKey } from "./secretStore.js";
 export {
   PROJECT_FILE_KIND,
   PROJECT_FILE_VERSION,

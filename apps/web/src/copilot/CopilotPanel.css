@@ -18,6 +18,28 @@
   color: #e8eaed;
 }
 
+.copilot-key__remember {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: #9aa3b2;
+  cursor: pointer;
+}
+
+.copilot-key__remember input {
+  margin: 0;
+  cursor: pointer;
+}
+
+.copilot-key__warning {
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: #e0b050;
+}
+
 .copilot-placeholder {
   color: #9aa3b2;
   font-size: 0.85rem;

@@ -3,6 +3,7 @@ import { applyActions, emptySchema } from "@schema-studio/core";
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 
+import type { ChatMessage } from "../copilot/messages.js";
 import {
   type HistoryController,
   type Selection,
@@ -23,6 +24,7 @@ export type SchemaStore = {
   schema: Schema;
   sources: Source[];
   selection: Selection;
+  chat: ChatMessage[];
 
   runActions: (rawActions: unknown[]) => RunActionsResult;
 
@@ -52,7 +54,10 @@ export type SchemaStore = {
   addSource: (source: Source) => void;
   removeSource: (sourceId: string) => void;
 
-  loadProject: (schema: Schema, sources: Source[]) => void;
+  appendChatMessages: (messages: ChatMessage[]) => void;
+  clearChat: () => void;
+
+  loadProject: (schema: Schema, sources: Source[], chat?: ChatMessage[]) => void;
 
   selectTable: (tableId: string | undefined) => void;
   selectField: (tableId: string, fieldId: string) => void;
@@ -73,6 +78,7 @@ export type CreateSchemaStoreOptions = {
   makeId?: () => string;
   initialSchema?: Schema;
   initialSources?: Source[];
+  initialChat?: ChatMessage[];
 };
 
 function snapshotFromState(
@@ -151,6 +157,7 @@ export function createSchemaStore(options?: CreateSchemaStoreOptions) {
         schema: options?.initialSchema ?? emptySchema(),
         sources: options?.initialSources ?? [],
         selection: {},
+        chat: options?.initialChat ?? [],
         _history: createHistoryController(),
         _makeId: makeId,
 
@@ -388,12 +395,30 @@ export function createSchemaStore(options?: CreateSchemaStoreOptions) {
           });
         },
 
+        // Chat is deliberately kept out of the undo/redo history — undoing a schema edit
+        // should not also erase the conversation that produced it.
+        appendChatMessages: (messages) => {
+          if (messages.length === 0) {
+            return;
+          }
+          set((draft) => {
+            draft.chat.push(...messages);
+          });
+        },
+
+        clearChat: () => {
+          set((draft) => {
+            draft.chat = [];
+          });
+        },
+
         // Replace the entire working set when switching local projects. History is
         // reset so undo never crosses a project boundary.
-        loadProject: (schema, sources) => {
+        loadProject: (schema, sources, chat = []) => {
           set((draft) => {
             draft.schema = structuredClone(schema);
             draft.sources = structuredClone(sources);
+            draft.chat = structuredClone(chat);
             draft.selection = {};
             draft._history = createHistoryController();
           });

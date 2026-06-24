@@ -49,6 +49,7 @@ function record(id: string, overrides: Partial<ProjectRecord> = {}): ProjectReco
     updatedAt: 1,
     schema: sampleSchema(),
     sources: [sampleSource()],
+    chat: [],
     ...overrides,
   };
 }
@@ -105,6 +106,7 @@ describe("project file serialization", () => {
       name: "My project",
       schema: sampleSchema(),
       sources: [sampleSource()],
+      chat: [],
     });
 
     const result = parseProjectFile(json);
@@ -115,6 +117,52 @@ describe("project file serialization", () => {
       expect(result.file.schema.tables[0]?.name).toBe("users");
       expect(result.file.sources[0]?.id).toBe("s1");
     }
+  });
+
+  it("round-trips chat history", () => {
+    const json = serializeProjectFile({
+      name: "With chat",
+      schema: sampleSchema(),
+      sources: [],
+      chat: [
+        { id: "m1", role: "user", text: "link these on grant_no" },
+        { id: "m2", role: "assistant", text: "Done.", applied: ["Added relationship"] },
+      ],
+    });
+
+    const result = parseProjectFile(json);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.file.chat).toHaveLength(2);
+      expect(result.file.chat[1]).toMatchObject({
+        role: "assistant",
+        applied: ["Added relationship"],
+      });
+    }
+  });
+
+  it("imports a v1 file without chat, defaulting to an empty conversation", () => {
+    const v1 = {
+      kind: PROJECT_FILE_KIND,
+      version: 1,
+      name: "Legacy",
+      schema: sampleSchema(),
+      sources: [sampleSource()],
+    };
+    const result = parseProjectFile(JSON.stringify(v1));
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.file.chat).toEqual([]);
+    }
+  });
+
+  it("rejects a malformed chat message instead of dropping it", () => {
+    const file = {
+      ...toProjectFile({ name: "bad", schema: sampleSchema(), sources: [], chat: [] }),
+      chat: [{ id: "m1", role: "wizard", text: "hi" }],
+    };
+    const result = parseProjectFile(JSON.stringify(file));
+    expect(result).toEqual({ ok: false, error: "Project file has an invalid chat message." });
   });
 
   it("rejects non-JSON input", () => {
@@ -129,7 +177,7 @@ describe("project file serialization", () => {
 
   it("rejects a structurally invalid schema instead of loading it partially", () => {
     const file = {
-      ...toProjectFile({ name: "bad", schema: sampleSchema(), sources: [] }),
+      ...toProjectFile({ name: "bad", schema: sampleSchema(), sources: [], chat: [] }),
       schema: { tables: [{ id: "x" }], relationships: [] },
     };
     const result = parseProjectFile(JSON.stringify(file));
@@ -138,7 +186,7 @@ describe("project file serialization", () => {
 
   it("rejects an invalid source", () => {
     const file = {
-      ...toProjectFile({ name: "bad", schema: sampleSchema(), sources: [] }),
+      ...toProjectFile({ name: "bad", schema: sampleSchema(), sources: [], chat: [] }),
       sources: [{ id: "s1", name: "x" }],
     };
     const result = parseProjectFile(JSON.stringify(file));
@@ -146,7 +194,7 @@ describe("project file serialization", () => {
   });
 
   it("falls back to a default name when none is provided", () => {
-    const file = { ...toProjectFile({ name: "", schema: sampleSchema(), sources: [] }) };
+    const file = { ...toProjectFile({ name: "", schema: sampleSchema(), sources: [], chat: [] }) };
     const result = parseProjectFile(JSON.stringify(file));
     expect(result.ok).toBe(true);
     if (result.ok) {

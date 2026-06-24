@@ -1,5 +1,7 @@
 import type { Schema, Source } from "@schema-studio/core";
 
+import type { ChatMessage } from "../copilot/messages.js";
+
 /** Lightweight project descriptor used for listing/switching without loading the full body. */
 export type ProjectMeta = {
   id: string;
@@ -8,10 +10,11 @@ export type ProjectMeta = {
   updatedAt: number;
 };
 
-/** A full local project: its metadata plus the working set (schema + parsed sources). */
+/** A full local project: its metadata plus the working set (schema, parsed sources, chat). */
 export type ProjectRecord = ProjectMeta & {
   schema: Schema;
   sources: Source[];
+  chat: ChatMessage[];
 };
 
 /**
@@ -28,7 +31,8 @@ export interface KeyValueStore {
 
 /** Marker + version for the import/export file format. */
 export const PROJECT_FILE_KIND = "schema-studio/project";
-export const PROJECT_FILE_VERSION = 1;
+// v2 adds `chat`. v1 files (no chat) still import — chat defaults to [].
+export const PROJECT_FILE_VERSION = 2;
 
 /** On-disk JSON shape for a project exported from / imported into the app. */
 export type ProjectFile = {
@@ -37,4 +41,5 @@ export type ProjectFile = {
   name: string;
   schema: Schema;
   sources: Source[];
+  chat: ChatMessage[];
 };

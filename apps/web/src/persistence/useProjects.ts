@@ -2,6 +2,7 @@ import type { Schema, Source } from "@schema-studio/core";
 import { emptySchema } from "@schema-studio/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import type { ChatMessage } from "../copilot/messages.js";
 import { useSchemaStore } from "../store/index.js";
 import { IndexedDbKeyValueStore } from "./kv.js";
 import {
@@ -20,9 +21,14 @@ const DEFAULT_NAME = "Untitled project";
 
 const makeId = (): string => crypto.randomUUID();
 
-function newRecord(name: string, schema: Schema, sources: Source[]): ProjectRecord {
+function newRecord(
+  name: string,
+  schema: Schema,
+  sources: Source[],
+  chat: ChatMessage[],
+): ProjectRecord {
   const now = Date.now();
-  return { id: makeId(), name, createdAt: now, updatedAt: now, schema, sources };
+  return { id: makeId(), name, createdAt: now, updatedAt: now, schema, sources, chat };
 }
 
 export type UseProjects = {
@@ -78,7 +84,7 @@ export function useProjects(
   // Write the active project record from explicit values (id + live store state). Shared by
   // the debounced autosave and the pre-switch flush.
   const writeActive = useCallback(
-    async (id: string, schema: Schema, sources: Source[]) => {
+    async (id: string, schema: Schema, sources: Source[], chat: ChatMessage[]) => {
       const previous = await loadProjectRecord(kv, id);
       const now = Date.now();
       await saveProjectRecord(kv, {
@@ -88,6 +94,7 @@ export function useProjects(
         updatedAt: now,
         schema,
         sources,
+        chat,
       });
       await refreshList();
     },
@@ -95,7 +102,7 @@ export function useProjects(
   );
 
   const activate = useCallback((record: ProjectRecord) => {
-    useSchemaStore.getState().loadProject(record.schema, record.sources);
+    useSchemaStore.getState().loadProject(record.schema, record.sources, record.chat);
     setActiveIdState(record.id);
   }, []);
 
@@ -112,7 +119,7 @@ export function useProjects(
 
       if (!record) {
         const state = useSchemaStore.getState();
-        record = newRecord(DEFAULT_NAME, state.schema, state.sources);
+        record = newRecord(DEFAULT_NAME, state.schema, state.sources, state.chat);
         await saveProjectRecord(kv, record);
         await setActiveProjectId(kv, record.id);
       }
@@ -144,13 +151,17 @@ export function useProjects(
         return;
       }
       const state = useSchemaStore.getState();
-      await writeActive(id, state.schema, state.sources);
+      await writeActive(id, state.schema, state.sources, state.chat);
     };
 
     flushRef.current = saveNow;
 
     const unsubscribe = useSchemaStore.subscribe((state, prev) => {
-      if (state.schema === prev.schema && state.sources === prev.sources) {
+      if (
+        state.schema === prev.schema &&
+        state.sources === prev.sources &&
+        state.chat === prev.chat
+      ) {
         return;
       }
       if (timer) {
@@ -171,7 +182,7 @@ export function useProjects(
   const newProject = useCallback(() => {
     void (async () => {
       await flushRef.current();
-      const record = newRecord(DEFAULT_NAME, emptySchema(), []);
+      const record = newRecord(DEFAULT_NAME, emptySchema(), [], []);
       await saveProjectRecord(kv, record);
       await setActiveProjectId(kv, record.id);
       activate(record);
@@ -207,7 +218,7 @@ export function useProjects(
         if (id === activeIdRef.current) {
           const remaining = await listProjects(kv);
           const next = remaining[0] ? await loadProjectRecord(kv, remaining[0].id) : undefined;
-          const record = next ?? newRecord(DEFAULT_NAME, emptySchema(), []);
+          const record = next ?? newRecord(DEFAULT_NAME, emptySchema(), [], []);
           if (!next) {
             await saveProjectRecord(kv, record);
           }
@@ -245,7 +256,12 @@ export function useProjects(
     const meta = projects.find((project) => project.id === activeIdRef.current);
     const state = useSchemaStore.getState();
     const name = meta?.name ?? DEFAULT_NAME;
-    const json = serializeProjectFile({ name, schema: state.schema, sources: state.sources });
+    const json = serializeProjectFile({
+      name,
+      schema: state.schema,
+      sources: state.sources,
+      chat: state.chat,
+    });
 
     const blob = new Blob([json], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -266,7 +282,12 @@ export function useProjects(
           return;
         }
         await flushRef.current();
-        const record = newRecord(result.file.name, result.file.schema, result.file.sources);
+        const record = newRecord(
+          result.file.name,
+          result.file.schema,
+          result.file.sources,
+          result.file.chat,
+        );
         await saveProjectRecord(kv, record);
         await setActiveProjectId(kv, record.id);
         activate(record);

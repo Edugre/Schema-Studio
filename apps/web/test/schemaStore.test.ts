@@ -128,6 +128,32 @@ describe("schemaStore", () => {
     });
   });
 
+  describe("chat", () => {
+    it("appends and clears chat messages", () => {
+      const store = createSchemaStore({ makeId: makeTestIds() });
+
+      store.getState().appendChatMessages([{ id: "m1", role: "user", text: "hi" }]);
+      store.getState().appendChatMessages([{ id: "m2", role: "assistant", text: "hello" }]);
+      expect(store.getState().chat.map((m) => m.id)).toEqual(["m1", "m2"]);
+
+      store.getState().clearChat();
+      expect(store.getState().chat).toEqual([]);
+    });
+
+    it("does not revert chat on undo", () => {
+      const store = createSchemaStore({ makeId: makeTestIds() });
+
+      store.getState().addTable("users");
+      store.getState().appendChatMessages([{ id: "m1", role: "user", text: "add users" }]);
+
+      store.getState().undo();
+
+      // The schema edit is undone, but the conversation that produced it stays.
+      expect(store.getState().schema.tables).toHaveLength(0);
+      expect(store.getState().chat.map((m) => m.id)).toEqual(["m1"]);
+    });
+  });
+
   describe("undo and redo", () => {
     it("undoes and redoes schema mutations from runActions", () => {
       const store = createSchemaStore({ makeId: makeTestIds() });
@@ -230,10 +256,18 @@ describe("schemaStore", () => {
 
       const nextSchema = emptySchema();
       nextSchema.tables.push({ id: "t-x", name: "orders", x: 5, y: 7, fields: [] });
-      store.getState().loadProject(nextSchema, [sampleSource("source-2")]);
+      store.getState().appendChatMessages([{ id: "m0", role: "user", text: "old" }]);
+      store
+        .getState()
+        .loadProject(
+          nextSchema,
+          [sampleSource("source-2")],
+          [{ id: "m1", role: "user", text: "new project" }],
+        );
 
       expect(store.getState().schema.tables.map((table) => table.name)).toEqual(["orders"]);
       expect(store.getState().sources.map((source) => source.id)).toEqual(["source-2"]);
+      expect(store.getState().chat.map((m) => m.id)).toEqual(["m1"]);
       // Undo must not reach across the project boundary.
       expect(store.getState().canUndo()).toBe(false);
     });

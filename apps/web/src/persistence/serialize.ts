@@ -1,6 +1,7 @@
 import type { Source } from "@schema-studio/core";
 import { SchemaSchema, SourceSchema } from "@schema-studio/core";
 
+import { type ChatMessage, ChatMessageSchema } from "../copilot/messages.js";
 import {
   PROJECT_FILE_KIND,
   PROJECT_FILE_VERSION,
@@ -8,7 +9,7 @@ import {
   type ProjectRecord,
 } from "./types.js";
 
-type ExportableProject = Pick<ProjectRecord, "name" | "schema" | "sources">;
+type ExportableProject = Pick<ProjectRecord, "name" | "schema" | "sources" | "chat">;
 
 export function toProjectFile(project: ExportableProject): ProjectFile {
   return {
@@ -17,6 +18,7 @@ export function toProjectFile(project: ExportableProject): ProjectFile {
     name: project.name,
     schema: project.schema,
     sources: project.sources,
+    chat: project.chat,
   };
 }
 
@@ -66,6 +68,23 @@ export function parseProjectFile(text: string): ParseProjectResult {
     sources.push(sourceResult.data);
   }
 
+  // Chat was added in v2. v1 files omit it; treat a missing field as an empty conversation,
+  // but reject a present-but-malformed one rather than silently dropping messages.
+  const chat: ChatMessage[] = [];
+  const rawChat = obj["chat"];
+  if (rawChat !== undefined) {
+    if (!Array.isArray(rawChat)) {
+      return { ok: false, error: "Project file has invalid chat history." };
+    }
+    for (const raw of rawChat) {
+      const chatResult = ChatMessageSchema.safeParse(raw);
+      if (!chatResult.success) {
+        return { ok: false, error: "Project file has an invalid chat message." };
+      }
+      chat.push(chatResult.data);
+    }
+  }
+
   const rawName = obj["name"];
   const name =
     typeof rawName === "string" && rawName.trim().length > 0 ? rawName : "Imported project";
@@ -74,6 +93,6 @@ export function parseProjectFile(text: string): ParseProjectResult {
 
   return {
     ok: true,
-    file: { kind: PROJECT_FILE_KIND, version, name, schema: schemaResult.data, sources },
+    file: { kind: PROJECT_FILE_KIND, version, name, schema: schemaResult.data, sources, chat },
   };
 }
