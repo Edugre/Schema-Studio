@@ -1,0 +1,75 @@
+.projects-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 48px;
+  padding: 0 16px;
+  /* Leave the top-right clear for the fixed Export menu. */
+  padding-right: 360px;
+  background: #151922;
+  border-bottom: 1px solid #2a2f3a;
+}
+
+.projects-bar__brand {
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #e8eaed;
+}
+
+.projects-bar__select,
+.projects-bar__rename {
+  min-width: 180px;
+  max-width: 260px;
+  padding: 5px 8px;
+  font-size: 0.8rem;
+  border-radius: 6px;
+  border: 1px solid #3d4657;
+  background: #1b2130;
+  color: #cdd5e4;
+}
+
+.projects-bar__rename {
+  outline: 1px solid #5b8def;
+}
+
+.projects-bar__actions {
+  display: flex;
+  gap: 6px;
+}
+
+.projects-bar__actions button {
+  padding: 5px 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid #3d4657;
+  background: #1b2130;
+  color: #cdd5e4;
+  cursor: pointer;
+}
+
+.projects-bar__actions button:hover:not(:disabled) {
+  border-color: #5b8def;
+  color: #fff;
+}
+
+.projects-bar__actions button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.projects-bar__file {
+  display: none;
+}
+
+.projects-bar__error {
+  margin-left: auto;
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  border-radius: 6px;
+  border: 1px solid #6b3030;
+  background: #2a1818;
+  color: #e88;
+  cursor: pointer;
+}

@@ -52,6 +52,8 @@ export type SchemaStore = {
   addSource: (source: Source) => void;
   removeSource: (sourceId: string) => void;
 
+  loadProject: (schema: Schema, sources: Source[]) => void;
+
   selectTable: (tableId: string | undefined) => void;
   selectField: (tableId: string, fieldId: string) => void;
   clearSelection: () => void;
@@ -383,6 +385,17 @@ export function createSchemaStore(options?: CreateSchemaStoreOptions) {
         removeSource: (sourceId) => {
           commitSnapshot((draft) => {
             draft.sources = draft.sources.filter((source) => source.id !== sourceId);
+          });
+        },
+
+        // Replace the entire working set when switching local projects. History is
+        // reset so undo never crosses a project boundary.
+        loadProject: (schema, sources) => {
+          set((draft) => {
+            draft.schema = structuredClone(schema);
+            draft.sources = structuredClone(sources);
+            draft.selection = {};
+            draft._history = createHistoryController();
           });
         },
 

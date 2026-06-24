@@ -220,4 +220,33 @@ describe("schemaStore", () => {
       expect(store.getState().sources).toEqual([]);
     });
   });
+
+  describe("loadProject", () => {
+    it("replaces schema and sources and resets history", () => {
+      const store = createSchemaStore({ makeId: makeTestIds() });
+      store.getState().addTable("users");
+      store.getState().addSource(sampleSource("source-1"));
+      expect(store.getState().canUndo()).toBe(true);
+
+      const nextSchema = emptySchema();
+      nextSchema.tables.push({ id: "t-x", name: "orders", x: 5, y: 7, fields: [] });
+      store.getState().loadProject(nextSchema, [sampleSource("source-2")]);
+
+      expect(store.getState().schema.tables.map((table) => table.name)).toEqual(["orders"]);
+      expect(store.getState().sources.map((source) => source.id)).toEqual(["source-2"]);
+      // Undo must not reach across the project boundary.
+      expect(store.getState().canUndo()).toBe(false);
+    });
+
+    it("clones inputs so later edits to the source objects do not leak in", () => {
+      const store = createSchemaStore({ makeId: makeTestIds() });
+      const schema = emptySchema();
+      schema.tables.push({ id: "t-x", name: "orders", x: 0, y: 0, fields: [] });
+
+      store.getState().loadProject(schema, []);
+      schema.tables[0]!.name = "mutated";
+
+      expect(store.getState().schema.tables[0]?.name).toBe("orders");
+    });
+  });
 });

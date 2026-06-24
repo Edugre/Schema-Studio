@@ -41,7 +41,14 @@ export function parseCopilotResponse(
 
   const record = parsed as Record<string, unknown>;
   const reply = typeof record["reply"] === "string" ? record["reply"] : "";
-  const actions = Array.isArray(record["actions"]) ? record["actions"] : [];
+
+  // A present-but-non-array `actions` is a malformed payload — surface it rather than
+  // silently coercing to [] and dropping whatever the model intended.
+  const rawActions = record["actions"];
+  if (rawActions !== undefined && !Array.isArray(rawActions)) {
+    return { error: "Copilot returned 'actions' in an unexpected shape (expected an array)." };
+  }
+  const actions = Array.isArray(rawActions) ? rawActions : [];
 
   return { reply, actions };
 }
