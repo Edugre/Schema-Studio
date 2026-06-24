@@ -215,6 +215,34 @@ describe("parseJson", () => {
     expect(source.fields[0]?.samples).toEqual(["1"]);
   });
 
+  it("unwraps records from a top-level envelope object", () => {
+    const source = parseJson(
+      '{"data":[{"id":1,"name":"Ada"},{"id":2,"name":"Bob"}]}',
+      "envelope.json",
+      opts,
+    );
+
+    expect(source.fields.map((field) => field.name)).toEqual(["id", "name"]);
+    expect(source.fields[0]?.samples).toEqual(["1", "2"]);
+  });
+
+  it("unwraps the largest record array and ignores envelope metadata", () => {
+    const source = parseJson(
+      '{"count":2,"results":[{"sku":"A1","qty":3},{"sku":"B2","qty":7}]}',
+      "results.json",
+      opts,
+    );
+
+    expect(source.fields.map((field) => field.name)).toEqual(["sku", "qty"]);
+  });
+
+  it("does not unwrap arrays of scalars", () => {
+    const source = parseJson('{"name":"cfg","tags":["a","b"]}', "scalars.json", opts);
+
+    expect(source.fields.map((field) => field.name)).toEqual(["name", "tags"]);
+    expect(source.fields[1]?.samples).toEqual(['["a","b"]']);
+  });
+
   it("throws ParseError for malformed JSON", () => {
     expect(() => parseJson("{not json", "bad.json", opts)).toThrow(ParseError);
   });

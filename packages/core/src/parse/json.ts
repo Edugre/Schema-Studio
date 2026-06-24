@@ -10,6 +10,41 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/** The records in `value` if it is an array containing at least one object, else undefined. */
+function asRecordArray(value: unknown): Record<string, unknown>[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  const records = value.filter(isRecord);
+  return records.length > 0 ? records : undefined;
+}
+
+/**
+ * Resolve the list of records to model as rows. A bare array is used directly. For a top-level
+ * object we unwrap the common envelope shape — `{ "data": [ {...}, ... ] }`, `{ "results": [...] }`
+ * — by using the largest property that holds an array of objects; otherwise the object itself is
+ * treated as a single record. (Arrays of scalars are left alone, so `{ "tags": ["a","b"] }` stays
+ * a single record with a `tags` field rather than being mistaken for the row set.)
+ */
+function extractRecords(parsed: unknown): Record<string, unknown>[] {
+  if (Array.isArray(parsed)) {
+    return parsed.filter(isRecord);
+  }
+
+  if (isRecord(parsed)) {
+    let best: Record<string, unknown>[] | undefined;
+    for (const value of Object.values(parsed)) {
+      const candidate = asRecordArray(value);
+      if (candidate && (!best || candidate.length > best.length)) {
+        best = candidate;
+      }
+    }
+    return best ?? [parsed];
+  }
+
+  return [];
+}
+
 function scalarToString(value: unknown): string {
   if (value === null || value === undefined) {
     return "";
@@ -107,14 +142,7 @@ export function parseJson(input: string, name: string, opts?: ParseOptions): Sou
     throw new ParseError(`Unable to parse JSON in "${name}"`);
   }
 
-  let records: Record<string, unknown>[];
-  if (Array.isArray(parsed)) {
-    records = parsed.filter(isRecord);
-  } else if (isRecord(parsed)) {
-    records = [parsed];
-  } else {
-    records = [];
-  }
+  const records = extractRecords(parsed);
 
   const scanRecords = records.slice(0, MAX_SCAN_ROWS);
   const keyOrder = unionFieldKeys(scanRecords);
