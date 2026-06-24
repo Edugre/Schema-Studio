@@ -1,4 +1,10 @@
-import type { AiProvider, AiProviderResult, ParsedSource, Schema } from "@schema-studio/core";
+import type {
+  AiProvider,
+  AiProviderResult,
+  ConversationTurn,
+  ParsedSource,
+  Schema,
+} from "@schema-studio/core";
 
 import { buildCopilotSystemPrompt } from "../copilot/systemPrompt.js";
 import { parseCopilotResponse } from "../copilot/parseResponse.js";
@@ -18,6 +24,7 @@ export class AnthropicBrowserProvider implements AiProvider {
     schema: Schema,
     sources: ParsedSource[],
     message: string,
+    history: ConversationTurn[] = [],
   ): Promise<AiProviderResult> {
     const systemPrompt = buildCopilotSystemPrompt(schema, sources);
 
@@ -32,8 +39,11 @@ export class AnthropicBrowserProvider implements AiProvider {
       body: JSON.stringify({
         model: DEFAULT_MODEL,
         max_tokens: 4096,
-        system: systemPrompt,
-        messages: [{ role: "user", content: message }],
+        // The system prompt re-embeds the live schema + source samples each turn (the largest
+        // block). Caching it means follow-up turns with an unchanged canvas reuse that prefix at
+        // ~0.1x cost; history is sent after `system`, so it never invalidates this cache.
+        system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
+        messages: [...history, { role: "user", content: message }],
       }),
     });
 

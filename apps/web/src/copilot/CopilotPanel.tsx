@@ -10,6 +10,7 @@ import {
   formatRejectedAction,
   summarizeAppliedActions,
 } from "./formatActions.js";
+import { buildConversationHistory } from "./conversation.js";
 import { type ChatMessage, nextMessageId } from "./messages.js";
 import { useApiKey } from "./useApiKey.js";
 
@@ -46,13 +47,16 @@ export function CopilotPanel() {
       return;
     }
 
+    // Capture history from the conversation so far, before appending the new user turn.
+    const history = buildConversationHistory(messages);
+
     setDraft("");
     appendChatMessages([{ id: nextMessageId(), role: "user", text }]);
     setBusy(true);
     scrollToBottom();
 
     try {
-      const { reply, actions } = await provider.propose(schema, sources, text);
+      const { reply, actions } = await provider.propose(schema, sources, text, history);
       const { applied, rejected } = runActions(actions);
       const updatedSchema = useSchemaStore.getState().schema;
 
