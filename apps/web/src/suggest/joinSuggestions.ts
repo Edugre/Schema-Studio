@@ -1,5 +1,12 @@
-import type { JoinKeyCandidate, Schema, Source } from "@schema-studio/core";
-import { detectJoinKeys } from "@schema-studio/core";
+import type {
+  Cardinality,
+  Grain,
+  JoinKeyCandidate,
+  PrimaryKeyCandidate,
+  Schema,
+  Source,
+} from "@schema-studio/core";
+import { detectJoinKeys, detectPrimaryKeys } from "@schema-studio/core";
 
 import { tableNameFromFilename } from "../sources/tableName.js";
 
@@ -24,6 +31,8 @@ export type JoinSuggestion = {
   sharedValues: number;
   /** Non-null when the columns need normalization before they'll join. */
   warning: string | null;
+  /** Inferred relationship grain for display, e.g. "1:N"; null when undetermined. */
+  grainLabel: string | null;
   /** True once both sides are linked in the schema — used to hide done suggestions. */
   alreadyLinked: boolean;
 };
@@ -72,6 +81,7 @@ export function buildJoinSuggestions(sources: Source[], schema: Schema): JoinSug
     overlapPercent: Math.round(candidate.normalizedOverlap * 100),
     sharedValues: candidate.sharedValues,
     warning: candidate.formatMismatch ? candidate.formatMismatch.note : null,
+    grainLabel: candidate.grain === "unknown" ? null : candidate.grain,
     alreadyLinked: isAlreadyLinked(schema, candidate),
   }));
 }
@@ -91,6 +101,27 @@ function tableForSource(schema: Schema, source: Source, fieldName: string) {
 export type ApplyPlan =
   | { ok: true; actions: unknown[]; builtTables: string[] }
   | { ok: false; error: string };
+
+/**
+ * Translate inferred grain into a relationship the schema model can hold. The model only has
+ * "1:1" | "1:N" | "N:M", so a many-to-one (`N:1`) is expressed as a `1:N` with the direction
+ * flipped — the FK points from the "many" side to the unique "one" side. `unknown` keeps the
+ * previous default (`1:N`, no flip).
+ */
+function planRelationship(grain: Grain): { cardinality: Cardinality; flip: boolean } {
+  switch (grain) {
+    case "1:1":
+      return { cardinality: "1:1", flip: false };
+    case "N:1":
+      return { cardinality: "1:N", flip: true };
+    case "N:M":
+      return { cardinality: "N:M", flip: false };
+    case "1:N":
+    case "unknown":
+    default:
+      return { cardinality: "1:N", flip: false };
+  }
+}
 
 /**
  * Build the validated action batch that realizes a suggestion: build either table from its
@@ -144,14 +175,162 @@ export function buildApplyPlan(
   const leftTable = resolve(leftSource, candidate.left.field);
   const rightTable = resolve(rightSource, candidate.right.field);
 
+  const { cardinality, flip } = planRelationship(candidate.grain);
+  const left = { table: leftTable, field: candidate.left.field };
+  const right = { table: rightTable, field: candidate.right.field };
+  const [from, to] = flip ? [right, left] : [left, right];
+
   actions.push({
     op: "add_relationship",
-    from_table: leftTable,
-    from_field: candidate.left.field,
-    to_table: rightTable,
-    to_field: candidate.right.field,
-    cardinality: "1:N",
+    from_table: from.table,
+    from_field: from.field,
+    to_table: to.table,
+    to_field: to.field,
+    cardinality,
   });
 
   return { ok: true, actions, builtTables };
+}
+
+/* --------------------------------------------------------------------------------------------
+ * Primary-key suggestions (SS-9): a column that the *data* shows is unique and non-null is a
+ * key candidate. We only surface candidates whose table already exists on the canvas, so the
+ * apply is a single `set_pk` through the validated path. Build the table first (e.g. via a join
+ * suggestion or "Build table") and the key suggestion appears.
+ * ------------------------------------------------------------------------------------------ */
+
+export type KeySuggestion = {
+  /** Stable key for React + dedupe. */
+  id: string;
+  candidate: PrimaryKeyCandidate;
+  /** "<sourceName> · <field>" */
+  label: string;
+  reason: string;
+  /** The table name in the current schema where the key would be set. */
+  tableName: string;
+};
+
+const MAX_KEY_SUGGESTIONS = 6;
+
+/**
+ * Surface primary-key candidates for fields already present on the canvas and not yet flagged
+ * as PK. Returns view models the panel renders; "Apply" turns one into a `set_pk` action.
+ */
+export function buildKeySuggestions(sources: Source[], schema: Schema): KeySuggestion[] {
+  const candidates = detectPrimaryKeys(sources);
+  const suggestions: KeySuggestion[] = [];
+
+  for (const candidate of candidates) {
+    const source = sources.find((entry) => entry.id === candidate.sourceId);
+    if (!source) {
+      continue;
+    }
+
+    const table = tableForSource(schema, source, candidate.field);
+    if (!table) {
+      continue; // table not built yet — nothing to set a key on
+    }
+
+    const field = table.fields.find((entry) => fieldNamesEqual(entry.name, candidate.field));
+    if (!field || field.pk) {
+      continue; // missing or already the primary key
+    }
+
+    suggestions.push({
+      id: `${candidate.sourceId}:${table.name}:${candidate.field}`,
+      candidate,
+      label: `${table.name} · ${candidate.field}`,
+      reason: candidate.reason,
+      tableName: table.name,
+    });
+
+    if (suggestions.length >= MAX_KEY_SUGGESTIONS) {
+      break;
+    }
+  }
+
+  return suggestions;
+}
+
+/** Build the validated `set_pk` action batch for a key suggestion. */
+export function buildSetPkPlan(suggestion: KeySuggestion): { actions: unknown[] } {
+  return {
+    actions: [
+      { op: "set_pk", table: suggestion.tableName, field: suggestion.candidate.field, pk: true },
+    ],
+  };
+}
+
+/* --------------------------------------------------------------------------------------------
+ * Column type suggestions (SS-9): the parser infers a type from each source column's values. A
+ * field on the canvas whose type disagrees with that inference is a refinement candidate — most
+ * commonly an AI- or hand-added field left as the "text" default whose data is actually numeric.
+ * Tables built from a source already carry the inferred type, so those never appear here. Applied
+ * via `set_type` through the validated path.
+ * ------------------------------------------------------------------------------------------ */
+
+export type TypeSuggestion = {
+  /** Stable key for React + dedupe. */
+  id: string;
+  /** "<table> · <field>" */
+  label: string;
+  tableName: string;
+  field: string;
+  currentType: string;
+  suggestedType: string;
+  reason: string;
+};
+
+const MAX_TYPE_SUGGESTIONS = 8;
+
+/**
+ * Suggest a column type for canvas fields whose current type disagrees with what their source
+ * column's values infer. Only fields already present on the canvas are considered.
+ */
+export function buildTypeSuggestions(sources: Source[], schema: Schema): TypeSuggestion[] {
+  const suggestions: TypeSuggestion[] = [];
+
+  for (const source of sources) {
+    for (const sourceField of source.fields) {
+      const table = tableForSource(schema, source, sourceField.name);
+      if (!table) {
+        continue;
+      }
+
+      const field = table.fields.find((entry) => fieldNamesEqual(entry.name, sourceField.name));
+      if (!field || field.type.toLowerCase() === sourceField.type.toLowerCase()) {
+        continue; // missing, or already the inferred type
+      }
+
+      suggestions.push({
+        id: `${source.id}:${table.name}:${sourceField.name}`,
+        label: `${table.name} · ${sourceField.name}`,
+        tableName: table.name,
+        field: sourceField.name,
+        currentType: field.type,
+        suggestedType: sourceField.type,
+        reason: `data looks like ${sourceField.type}, not ${field.type}`,
+      });
+
+      if (suggestions.length >= MAX_TYPE_SUGGESTIONS) {
+        return suggestions;
+      }
+    }
+  }
+
+  return suggestions;
+}
+
+/** Build the validated `set_type` action batch for a type suggestion. */
+export function buildSetTypePlan(suggestion: TypeSuggestion): { actions: unknown[] } {
+  return {
+    actions: [
+      {
+        op: "set_type",
+        table: suggestion.tableName,
+        field: suggestion.field,
+        type: suggestion.suggestedType,
+      },
+    ],
+  };
 }
