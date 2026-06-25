@@ -3,3 +3,5 @@ dist/
 .pnpm-store/
 pnpm-lock.yaml
 coverage/
+# Local scratch data (large raw dumps) — would OOM prettier
+local-data/

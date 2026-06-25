@@ -12,3 +12,5 @@ coverage/
 ROADMAP.md
 # Local Claude Code launch config (machine-specific paths)
 .claude/
+# Local scratch data (e.g. full raw HRSA/OPAIS dumps) — kept out of the repo
+local-data/
