@@ -1,94 +1,148 @@
 :root {
   color-scheme: light dark;
-  font-family:
-    Inter,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
+
+  --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  font-family: var(--font-sans);
   line-height: 1.5;
   font-weight: 400;
 
-  /* Theme tokens — dark is the default. The light overrides below swap these
-     based on the OS appearance via prefers-color-scheme. */
-  --bg-app: #0f1117;
-  --bg-panel: #151922;
-  --surface: #1b2130;
-  --surface-strong: #252c3d;
-  --surface-sunken: #121826;
-  --surface-hover: #20283a;
+  /* ---- Design tokens (light is canonical; dark overrides below) ----
+     Sourced from the Schema Studio design handoff. The semantic names map
+     onto the design's color roles; legacy aliases are kept so existing
+     component CSS picks up the new palette without churn. */
 
-  --border: #3d4657;
-  --border-subtle: #2a2f3a;
+  /* Surfaces */
+  --bg-app: #fafbfc; /* canvas / app background */
+  --topbar-bg: #ffffff;
+  --bg-panel: #f4f6f8; /* side panes */
+  --surface: #ffffff; /* cards, table nodes, inputs */
+  --surface-strong: #f4f6f8; /* subtle fill — chips, sunken areas */
+  --surface-sunken: #f4f6f8;
+  --surface-hover: #eef1f4;
 
-  --text: #e8eaed;
-  --text-secondary: #cdd5e4;
-  --text-muted: #9aa3b2;
-  --text-faint: #7d8798;
-  --text-dim: #5b6478;
-  --text-strong: #fff;
+  /* Borders */
+  --border: #dce0e4; /* stronger — inputs, add button */
+  --border-subtle: #e9ecef; /* default — pane dividers, cards */
+  --row-divider: #f4f6f8; /* inner row dividers */
 
-  --accent: #5b8def;
-  --accent-soft: #8fb3ff;
-  --accent-text: #a8c4f5;
-  --accent-bg: rgba(91, 141, 239, 0.12);
-  --accent-border: rgba(91, 141, 239, 0.35);
+  /* Text */
+  --text: #454a50; /* primary */
+  --text-mono: #454a50; /* identifiers */
+  --text-secondary: #454a50;
+  --text-muted: #757c84; /* secondary / muted */
+  --text-faint: #9aa1a8; /* counts, samples, icons */
+  --text-dim: #9aa1a8;
+  --text-strong: #2a2e33;
 
-  --pk: #f0c14b;
-  --warning: #e0b050;
+  /* Accent — purple, shared across modes */
+  --accent: #7c5ce0;
+  --accent-soft: #7c5ce0;
+  --accent-text: #6a4bd0;
+  --accent-bg: #f1eefc; /* tint fill — proposed row/card */
+  --accent-border: #e1dbfa; /* tint border */
+  --on-accent: #ffffff;
 
-  --danger: #e26b6b;
-  --danger-text: #f0a0a0;
-  --danger-bg: rgba(220, 80, 80, 0.12);
-  --danger-border: rgba(220, 80, 80, 0.35);
+  /* Primary key / identifier dot */
+  --pk: #454a50;
 
-  --fk-border: #34406b;
+  /* Caution — amber (rejected), shared accent across modes */
+  --warning: #b8801f;
+  --caution-bg: #fbf3e3;
+  --caution-border: #b8801f;
+  --caution-text: #b8801f;
 
-  --shadow-node: 0 8px 24px rgba(0, 0, 0, 0.25);
-  --shadow-popover: 0 16px 40px rgba(0, 0, 0, 0.45);
+  /* Destructive (remove/delete affordances) */
+  --danger: #cc3b3b;
+  --danger-text: #b42525;
+  --danger-bg: rgba(204, 59, 59, 0.1);
+  --danger-border: rgba(204, 59, 59, 0.3);
+
+  /* FK marker */
+  --fk-border: #e9ecef;
+
+  /* Edges */
+  --edge: #dce0e4;
+  --edge-proposed: #7c5ce0;
+
+  /* Privacy pill — blue, shared accent across modes */
+  --privacy-bg: #eaf1fb;
+  --privacy-text: #3e72b8;
+
+  /* Success — green, shared */
+  --success: #2e9b5c;
+
+  /* Inline code chip (chat) */
+  --code-chip-bg: #e9ecef;
+
+  /* Shadows + proposed ring */
+  --shadow-frame: 0 4px 12px rgba(23, 26, 31, 0.1);
+  --shadow-node: 0 1px 2px rgba(23, 26, 31, 0.06);
+  --shadow-popover: 0 16px 40px rgba(23, 26, 31, 0.18);
+  --ring-proposed: 0 0 0 3px #f1eefc, 0 1px 2px rgba(23, 26, 31, 0.06);
 
   color: var(--text);
   background-color: var(--bg-app);
 }
 
-@media (prefers-color-scheme: light) {
+@media (prefers-color-scheme: dark) {
   :root {
-    --bg-app: #f4f6fa;
-    --bg-panel: #ffffff;
-    --surface: #ffffff;
-    --surface-strong: #eef1f6;
-    --surface-sunken: #f0f3f8;
-    --surface-hover: #e6ebf3;
+    --bg-app: #0a0b0d;
+    --topbar-bg: #121316;
+    --bg-panel: #191b1f;
+    --surface: #121316;
+    --surface-strong: #23262b;
+    --surface-sunken: #23262b;
+    --surface-hover: #1e2125;
 
-    --border: #c7ced8;
-    --border-subtle: #e2e6ee;
+    --border: #454a50;
+    --border-subtle: #30343a;
+    --row-divider: #23262b;
 
-    --text: #1c2128;
-    --text-secondary: #2f3742;
-    --text-muted: #5b6675;
-    --text-faint: #7d8798;
-    --text-dim: #9aa3b2;
-    --text-strong: #0b0e14;
+    --text: #f4f6f8;
+    --text-mono: #e9ecef;
+    --text-secondary: #e9ecef;
+    --text-muted: #9aa1a8;
+    --text-faint: #757c84;
+    --text-dim: #757c84;
+    --text-strong: #ffffff;
 
-    --accent: #2f6fe0;
-    --accent-soft: #2f6fe0;
-    --accent-text: #1f5bc0;
-    --accent-bg: rgba(47, 111, 224, 0.1);
-    --accent-border: rgba(47, 111, 224, 0.35);
+    --accent: #7c5ce0;
+    --accent-soft: #7c5ce0;
+    --accent-text: #b7a6f2;
+    --accent-bg: #241a4a;
+    --accent-border: #52399e;
+    --on-accent: #ffffff;
 
-    --pk: #b8860b;
-    --warning: #9a6b00;
+    --pk: #e9ecef;
 
-    --danger: #cc3b3b;
-    --danger-text: #b42525;
-    --danger-bg: rgba(204, 59, 59, 0.1);
-    --danger-border: rgba(204, 59, 59, 0.3);
+    --warning: #c99a3a;
+    --caution-bg: #332406;
+    --caution-border: #b8801f;
+    --caution-text: #d9a648;
 
-    --fk-border: #b7c4ec;
+    --danger: #e26b6b;
+    --danger-text: #f0a0a0;
+    --danger-bg: rgba(220, 80, 80, 0.12);
+    --danger-border: rgba(220, 80, 80, 0.35);
 
-    --shadow-node: 0 8px 24px rgba(20, 30, 50, 0.1);
-    --shadow-popover: 0 16px 40px rgba(20, 30, 50, 0.18);
+    --fk-border: #30343a;
+
+    --edge: #454a50;
+    --edge-proposed: #7c5ce0;
+
+    --privacy-bg: #13202f;
+    --privacy-text: #5a8fd0;
+
+    --success: #2e9b5c;
+
+    --code-chip-bg: #30343a;
+
+    --shadow-frame: 0 4px 12px rgba(0, 0, 0, 0.5);
+    --shadow-node: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-popover: 0 16px 40px rgba(0, 0, 0, 0.5);
+    --ring-proposed: 0 0 0 3px #241a4a, 0 1px 2px rgba(0, 0, 0, 0.4);
   }
 }
 
@@ -106,8 +160,21 @@ body,
   height: 100%;
 }
 
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
 button,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
+}
+
+/* Shared mono helper for identifiers, type chips, samples, code, tags. */
+.mono {
+  font-family: var(--font-mono);
+  letter-spacing: -0.01em;
 }

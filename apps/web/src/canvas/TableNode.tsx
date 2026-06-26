@@ -37,9 +37,8 @@ function FieldRow({ table, field }: { table: Table; field: Field }) {
           event.stopPropagation();
           togglePk(table.id, field.id);
         }}
-      >
-        {field.pk ? "★" : "☆"}
-      </button>
+      />
+
       <span className="table-node__field-name">{field.name}</span>
       {field.fk ? <span className="table-node__fk">FK</span> : null}
       <span className="table-node__type">{field.type}</span>
@@ -108,7 +107,8 @@ function TableTitle({ table }: { table: Table }) {
         setEditing(true);
       }}
     >
-      {table.name}
+      <span>{table.name}</span>
+      <span className="table-node__count">{table.fields.length}</span>
     </div>
   );
 }

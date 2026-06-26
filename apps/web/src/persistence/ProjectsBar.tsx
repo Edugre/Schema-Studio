@@ -46,9 +46,7 @@ export function ProjectsBar() {
   };
 
   return (
-    <header className="projects-bar">
-      <span className="projects-bar__brand">Schema Studio</span>
-
+    <div className="projects-bar">
       {renaming ? (
         <input
           className="projects-bar__rename"
@@ -130,6 +128,6 @@ export function ProjectsBar() {
           {error} ✕
         </button>
       ) : null}
-    </header>
+    </div>
   );
 }

@@ -1,5 +1,6 @@
 import {
   Background,
+  BackgroundVariant,
   Controls,
   MarkerType,
   MiniMap,
@@ -12,6 +13,8 @@ import "@xyflow/react/dist/style.css";
 import { useCallback, useEffect, useRef } from "react";
 
 import { useSchemaStore } from "../store/index.js";
+import { PlusIcon, RedoIcon, UndoIcon } from "../ui/icons.js";
+import { registerArrangeHandler } from "./arrangeBridge.js";
 import { RelationshipEdge } from "./RelationshipEdge.js";
 import type { RelationshipFlowEdge } from "./RelationshipEdge.js";
 import { TableNode } from "./TableNode.js";
@@ -152,26 +155,54 @@ export function CanvasPanel() {
     requestAnimationFrame(() => instanceRef.current?.fitView({ duration: 300 }));
   }, [tables, relationships, moveTables]);
 
+  // Expose auto-arrange to the top bar's "Auto-arrange" button.
+  useEffect(() => registerArrangeHandler(() => void onAutoArrange()), [onAutoArrange]);
+
+  const tableCount = tables.length;
+  const relationshipCount = relationships.length;
+
   return (
     <section className="panel canvas-panel">
-      <header className="panel-header canvas-toolbar">
-        <span>Canvas</span>
-        <div className="canvas-toolbar__actions">
-          <button type="button" onClick={onAddTable}>
-            + Table
+      <div className="panel-body">
+        <div className="canvas-chip">
+          <span className="canvas-chip__label">Inferred schema</span>
+          <span className="canvas-chip__count">
+            {tableCount} {tableCount === 1 ? "table" : "tables"} · {relationshipCount}{" "}
+            {relationshipCount === 1 ? "relationship" : "relationships"}
+          </span>
+        </div>
+        <div className="canvas-tools">
+          <button
+            type="button"
+            className="canvas-tools__btn"
+            onClick={onAddTable}
+            title="Add table"
+          >
+            <PlusIcon size={15} />
+            <span>Table</span>
           </button>
-          <button type="button" onClick={() => void onAutoArrange()} disabled={tables.length === 0}>
-            Auto-arrange
+          <span className="canvas-tools__divider" />
+          <button
+            type="button"
+            className="canvas-tools__icon"
+            onClick={undo}
+            disabled={!canUndo}
+            title="Undo"
+            aria-label="Undo"
+          >
+            <UndoIcon size={15} />
           </button>
-          <button type="button" onClick={undo} disabled={!canUndo}>
-            Undo
-          </button>
-          <button type="button" onClick={redo} disabled={!canRedo}>
-            Redo
+          <button
+            type="button"
+            className="canvas-tools__icon"
+            onClick={redo}
+            disabled={!canRedo}
+            title="Redo"
+            aria-label="Redo"
+          >
+            <RedoIcon size={15} />
           </button>
         </div>
-      </header>
-      <div className="panel-body">
         <ReactFlow
           className="schema-canvas"
           nodes={nodes}
@@ -188,7 +219,7 @@ export function CanvasPanel() {
           deleteKeyCode={["Delete", "Backspace"]}
           fitView
         >
-          <Background />
+          <Background variant={BackgroundVariant.Dots} gap={24} size={1} />
           <Controls />
           <MiniMap pannable zoomable />
         </ReactFlow>

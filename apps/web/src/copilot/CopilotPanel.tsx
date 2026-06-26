@@ -3,6 +3,7 @@ import { useMemo, useRef, useState } from "react";
 
 import { AnthropicBrowserProvider } from "../ai/AnthropicBrowserProvider.js";
 import { useSchemaStore } from "../store/index.js";
+import { CheckIcon, InfoIcon, SendIcon, SparkleIcon } from "../ui/icons.js";
 import "./CopilotPanel.css";
 import { Markdown } from "./Markdown.js";
 import {
@@ -143,133 +144,152 @@ export function CopilotPanel() {
 
   return (
     <section className="panel copilot-panel">
-      <header className="panel-header">Copilot</header>
+      <header className="copilot-header">
+        <span className="copilot-header__logo" aria-hidden>
+          <SparkleIcon size={14} />
+        </span>
+        <h1 className="copilot-header__title">Copilot</h1>
+        <span className="copilot-header__tag">SS-9 detector</span>
+      </header>
       <div className="panel-body">
-        <div className="copilot-key">
-          <label htmlFor="anthropic-key">Anthropic API key</label>
-          <input
-            id="anthropic-key"
-            type="password"
-            placeholder="sk-ant-..."
-            value={apiKey}
-            onChange={(event) => setApiKey(event.target.value)}
-            autoComplete="off"
-          />
-          <label className="copilot-key__remember">
+        <div className="copilot-scroll">
+          <div className="copilot-key">
+            <label htmlFor="anthropic-key">Anthropic API key</label>
             <input
-              type="checkbox"
-              checked={remember}
-              onChange={(event) => setRemember(event.target.checked)}
+              id="anthropic-key"
+              type="password"
+              placeholder="sk-ant-..."
+              value={apiKey}
+              onChange={(event) => setApiKey(event.target.value)}
+              autoComplete="off"
             />
-            Remember key on this device
-          </label>
-          {remember ? (
-            <p className="copilot-key__warning">
-              Stored unencrypted in this browser. Anyone with access to this device can read it. It
-              is never included when you export or share a project.
+            <label className="copilot-key__remember">
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={(event) => setRemember(event.target.checked)}
+              />
+              Remember key on this device
+            </label>
+            {remember ? (
+              <p className="copilot-key__warning">
+                Stored unencrypted in this browser. Anyone with access to this device can read it.
+                It is never included when you export or share a project.
+              </p>
+            ) : null}
+          </div>
+
+          {!provider ? (
+            <p className="copilot-placeholder">
+              Enter an API key to enable the copilot. The canvas works without it — your key stays
+              in memory unless you choose to remember it on this device.
+            </p>
+          ) : null}
+
+          {messages.length > 0 ? (
+            <div className="copilot-chat">
+              {messages.map((message) => {
+                if (message.role === "user") {
+                  return (
+                    <div key={message.id} className="copilot-row copilot-row--user">
+                      <div className="copilot-bubble copilot-bubble--user">{message.text}</div>
+                    </div>
+                  );
+                }
+
+                if (message.role === "error") {
+                  return (
+                    <div key={message.id} className="copilot-row copilot-row--assistant">
+                      <span className="copilot-avatar copilot-avatar--error" aria-hidden>
+                        <InfoIcon size={13} />
+                      </span>
+                      <div className="copilot-body copilot-body--error">{message.text}</div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div key={message.id} className="copilot-row copilot-row--assistant">
+                    <span className="copilot-avatar" aria-hidden>
+                      <SparkleIcon size={13} />
+                    </span>
+                    <div className="copilot-body">
+                      <Markdown>{message.text}</Markdown>
+                      {message.applied
+                        ? message.applied.map((line) => (
+                            <div key={line} className="copilot-chip copilot-chip--applied">
+                              <CheckIcon size={15} />
+                              <span>
+                                <strong>Applied</strong> · {line}
+                              </span>
+                            </div>
+                          ))
+                        : null}
+                      {message.rejected
+                        ? message.rejected.map((line) => (
+                            <div key={line} className="copilot-chip copilot-chip--rejected">
+                              <InfoIcon size={15} />
+                              <span>
+                                <strong>Couldn&apos;t apply</strong> · {line}
+                              </span>
+                            </div>
+                          ))
+                        : null}
+                    </div>
+                  </div>
+                );
+              })}
+              {busy ? (
+                <p className="copilot-status">
+                  {progress && progress.attempt > 1
+                    ? `Working… (step ${progress.attempt}/${progress.max})`
+                    : "Thinking…"}
+                </p>
+              ) : null}
+              <div ref={chatEndRef} />
+            </div>
+          ) : provider ? (
+            <p className="copilot-placeholder">
+              Ask about your sources and schema — e.g. link tables on a grant number and warn if
+              sample formats differ.
             </p>
           ) : null}
         </div>
 
-        {!provider ? (
-          <p className="copilot-placeholder">
-            Enter an API key to enable the copilot. The canvas works without it — your key stays in
-            memory unless you choose to remember it on this device.
-          </p>
-        ) : null}
-
-        {messages.length > 0 ? (
-          <div className="copilot-chat">
-            {messages.map((message) => {
-              if (message.role === "user") {
-                return (
-                  <div key={message.id} className="copilot-message copilot-message--user">
-                    <span className="copilot-message__label">You</span>
-                    {message.text}
-                  </div>
-                );
-              }
-
-              if (message.role === "error") {
-                return (
-                  <div key={message.id} className="copilot-message copilot-message--error">
-                    <span className="copilot-message__label">Error</span>
-                    {message.text}
-                  </div>
-                );
-              }
-
-              return (
-                <div key={message.id} className="copilot-message copilot-message--assistant">
-                  <span className="copilot-message__label">Copilot</span>
-                  <Markdown>{message.text}</Markdown>
-                  {message.applied ? (
-                    <div className="copilot-applied">
-                      <strong>Applied to canvas</strong>
-                      <ul>
-                        {message.applied.map((line) => (
-                          <li key={line}>{line}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null}
-                  {message.rejected ? (
-                    <div className="copilot-rejected">
-                      <strong>Could not apply</strong>
-                      <ul>
-                        {message.rejected.map((line) => (
-                          <li key={line}>{line}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })}
-            {busy ? (
-              <p className="copilot-status">
-                {progress && progress.attempt > 1
-                  ? `Working… (step ${progress.attempt}/${progress.max})`
-                  : "Thinking…"}
-              </p>
-            ) : null}
-            <div ref={chatEndRef} />
-          </div>
-        ) : provider ? (
-          <p className="copilot-placeholder">
-            Ask about your sources and schema — e.g. link tables on a grant number and warn if
-            sample formats differ.
-          </p>
-        ) : null}
-
         <div className="copilot-compose">
-          <textarea
-            rows={3}
-            placeholder="Ask the copilot about your schema..."
-            value={draft}
-            disabled={!provider || busy}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                void handleSend();
-              }
-            }}
-          />
-          <div className="copilot-compose__actions">
-            {busy ? (
-              <button
-                type="button"
-                className="copilot-compose__cancel"
-                onClick={() => {
-                  cancelledRef.current = true;
-                }}
-              >
-                Cancel
-              </button>
-            ) : null}
-            <button type="button" onClick={() => void handleSend()} disabled={!provider || busy}>
-              {busy ? "Working…" : "Send"}
+          {busy ? (
+            <button
+              type="button"
+              className="copilot-compose__cancel"
+              onClick={() => {
+                cancelledRef.current = true;
+              }}
+            >
+              Cancel
+            </button>
+          ) : null}
+          <div className="copilot-compose__shell">
+            <textarea
+              rows={1}
+              placeholder="Ask about your schema…"
+              value={draft}
+              disabled={!provider || busy}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  void handleSend();
+                }
+              }}
+            />
+            <button
+              type="button"
+              className="copilot-compose__send"
+              onClick={() => void handleSend()}
+              disabled={!provider || busy}
+              aria-label="Send"
+            >
+              <SendIcon size={16} />
             </button>
           </div>
         </div>

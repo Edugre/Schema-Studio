@@ -3,6 +3,7 @@ import { useCallback, useRef, useState, type ReactNode } from "react";
 
 import { useSchemaStore } from "../store/index.js";
 import { JoinSuggestions } from "../suggest/index.js";
+import { ChevronDownIcon, FileIcon, PlusIcon } from "../ui/icons.js";
 import { addSourceFieldToTable, buildTableFromSource, formatSample } from "./buildFromSource.js";
 import "./SourcesPanel.css";
 import { readAndParseFile } from "./readAndParse.js";
@@ -32,32 +33,50 @@ function SourceCard({
   onRemove: () => void;
   children: ReactNode;
 }) {
+  const [expanded, setExpanded] = useState(true);
+
+  const meta = `${kind.toUpperCase()} · ${fieldCount} fields`;
+
   return (
-    <article className="sources-panel__source" data-source-id={sourceId}>
-      <header className="sources-panel__source-header">
-        <div className="sources-panel__source-meta">
+    <article
+      className={`sources-panel__source${expanded ? " is-expanded" : ""}`}
+      data-source-id={sourceId}
+    >
+      <button
+        type="button"
+        className="sources-panel__source-header"
+        onClick={() => setExpanded((value) => !value)}
+        aria-expanded={expanded}
+      >
+        <span className="sources-panel__source-icon">
+          <FileIcon size={16} />
+        </span>
+        <span className="sources-panel__source-meta">
           <span className="sources-panel__source-name" title={name}>
             {name}
           </span>
-          <span className="sources-panel__source-kind">
-            {kind} · {fieldCount} fields
-          </span>
+          <span className="sources-panel__source-kind">{meta}</span>
+        </span>
+        <ChevronDownIcon size={16} className="sources-panel__chevron" />
+      </button>
+      {expanded ? (
+        <div className="sources-panel__source-body">
+          {children}
+          <div className="sources-panel__source-actions">
+            <button type="button" className="sources-panel__button" onClick={onBuildTable}>
+              Build table
+            </button>
+            <button
+              type="button"
+              className="sources-panel__button sources-panel__button--ghost"
+              onClick={onRemove}
+              aria-label={`Remove ${name}`}
+            >
+              Remove
+            </button>
+          </div>
         </div>
-        <div className="sources-panel__source-actions">
-          <button type="button" className="sources-panel__button" onClick={onBuildTable}>
-            Build table
-          </button>
-          <button
-            type="button"
-            className="sources-panel__button sources-panel__button--ghost"
-            onClick={onRemove}
-            aria-label={`Remove ${name}`}
-          >
-            Remove
-          </button>
-        </div>
-      </header>
-      {children}
+      ) : null}
     </article>
   );
 }
@@ -183,7 +202,24 @@ export function SourcesPanel() {
 
   return (
     <section className="panel sources-panel">
-      <header className="panel-header">Sources</header>
+      <header className="sources-panel__header">
+        <div className="sources-panel__title-group">
+          <h1 className="sources-panel__title">Sources</h1>
+          <span className="sources-panel__subtitle">
+            {sources.length} {sources.length === 1 ? "file" : "files"}
+          </span>
+        </div>
+        <button
+          type="button"
+          className="sources-panel__add"
+          onClick={openFilePicker}
+          disabled={busy}
+          aria-label="Add source file"
+          title="Add a local file"
+        >
+          <PlusIcon size={16} />
+        </button>
+      </header>
       <div className="panel-body">
         <div
           className={`sources-panel__dropzone${dragActive ? " sources-panel__dropzone--active" : ""}`}
@@ -285,7 +321,7 @@ export function SourcesPanel() {
               onRemove={() => removeSource(source.id)}
             >
               <ul className="sources-panel__fields">
-                {source.fields.map((field) => {
+                {source.fields.map((field, index) => {
                   const sample = formatSample(field);
 
                   return (
@@ -301,15 +337,15 @@ export function SourcesPanel() {
                         }
                         onClick={() => handleAddField(source.id, field.name)}
                       >
+                        <span
+                          className={`sources-panel__dot${index === 0 ? " is-pk" : ""}`}
+                          aria-hidden
+                        />
                         <span className="sources-panel__field-name">{field.name}</span>
                         <span className="sources-panel__field-type">{field.type}</span>
-                        {sample !== null ? (
-                          <span className="sources-panel__field-sample">
-                            e.g. &quot;{sample}&quot;
-                          </span>
-                        ) : (
-                          <span className="sources-panel__field-sample">no samples</span>
-                        )}
+                        <span className="sources-panel__field-sample">
+                          {sample !== null ? sample : "—"}
+                        </span>
                       </button>
                     </li>
                   );

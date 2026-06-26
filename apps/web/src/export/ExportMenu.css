@@ -1,31 +1,32 @@
 .export-menu {
-  position: fixed;
-  top: 12px;
-  right: 332px;
-  z-index: 10;
+  position: relative;
 }
 
 .export-menu__toggle {
-  padding: 6px 14px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 16px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: var(--accent);
+  color: var(--on-accent);
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .export-menu__toggle:hover {
-  border-color: var(--accent);
-  color: var(--text-strong);
+  filter: brightness(0.94);
 }
 
 .export-menu__panel {
   position: absolute;
-  top: 38px;
+  top: 42px;
   right: 0;
+  z-index: 20;
   width: 420px;
   max-width: 80vw;
   display: flex;
@@ -68,11 +69,11 @@
   max-height: 360px;
   overflow: auto;
   padding: 10px 12px;
-  border-radius: 6px;
+  border-radius: 8px;
   border: 1px solid var(--border-subtle);
-  background: var(--bg-app);
+  background: var(--surface-strong);
   color: var(--text-secondary);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 0.78rem;
   line-height: 1.5;
   white-space: pre;

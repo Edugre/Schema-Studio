@@ -8,7 +8,13 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   eslintConfigPrettier,
   {
-    ignores: ["**/dist/**", "**/node_modules/**", "**/.pnpm-store/**"],
+    ignores: [
+      "**/dist/**",
+      "**/node_modules/**",
+      "**/.pnpm-store/**",
+      // Design-reference bundle (HTML mockups + preview-only runtime). Not app code.
+      "design_handoff_schema_studio/**",
+    ],
   },
   {
     files: ["**/*.{ts,tsx}"],

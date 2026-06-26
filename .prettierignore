@@ -5,3 +5,6 @@ pnpm-lock.yaml
 coverage/
 # Local scratch data (large raw dumps) — would OOM prettier
 local-data/
+
+# Design-reference bundle (HTML mockups + preview-only runtime)
+design_handoff_schema_studio/
