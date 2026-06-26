@@ -12,8 +12,8 @@ export default tseslint.config(
       "**/dist/**",
       "**/node_modules/**",
       "**/.pnpm-store/**",
-      // Design-reference bundle (HTML mockups + preview-only runtime). Not app code.
-      "design_handoff_schema_studio/**",
+      // Design-reference bundles (HTML mockups + preview-only runtime). Not app code.
+      "design_handoff_*/**",
     ],
   },
   {
