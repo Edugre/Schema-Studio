@@ -1,0 +1,145 @@
+/* Bottom-right suggestions nudge (handoff: design_handoff_suggestions, Part 1). Light-only per
+   the handoff bundle; uses --surface tokens so it still reads correctly in dark mode. */
+
+.suggest-toast {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 60;
+  width: 404px;
+  max-width: calc(100vw - 48px);
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(23, 26, 31, 0.16);
+  overflow: hidden;
+}
+
+.suggest-toast__header {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 16px 18px 0;
+}
+
+.suggest-toast__icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.suggest-toast__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.suggest-toast__title {
+  font-size: 15px;
+  line-height: 21px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.suggest-toast__subtitle {
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-muted);
+}
+
+.suggest-toast__close {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.suggest-toast__close:hover {
+  background: var(--surface-hover);
+}
+
+.suggest-toast__action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px 16px;
+}
+
+.suggest-toast__summary {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.suggest-toast__review {
+  color: var(--caution-text);
+}
+
+.suggest-toast__cta {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.suggest-toast__cta:hover {
+  filter: brightness(0.94);
+}
+
+/* Animated countdown bar, clipped to the toast's rounded bottom. */
+.suggest-toast__timer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: #efeff1;
+}
+
+.suggest-toast__timerfill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transform-origin: left center;
+  animation: ssTimerBar 8s linear forwards;
+}
+
+@keyframes ssTimerBar {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .suggest-toast__timerfill {
+    animation-duration: 12s;
+  }
+}

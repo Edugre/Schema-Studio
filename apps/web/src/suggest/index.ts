@@ -1,4 +1,12 @@
-export { JoinSuggestions } from "./JoinSuggestionsPanel.js";
+export { SuggestionsTab } from "./SuggestionsTab.js";
+export { SuggestionsToast } from "./SuggestionsToast.js";
+export {
+  useSuggestions,
+  type ApplyOutcome,
+  type SuggestionGroup,
+  type SuggestionItem,
+  type SuggestionsApi,
+} from "./useSuggestions.js";
 export {
   buildApplyPlan,
   buildJoinSuggestions,

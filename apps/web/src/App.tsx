@@ -3,9 +3,10 @@ import { useState } from "react";
 import { ByoKeyPage } from "./byokey/ByoKeyPage.js";
 import { CanvasPanel } from "./canvas/index.js";
 import { ApiKeyProvider } from "./copilot/ApiKeyContext.js";
-import { CopilotPanel } from "./copilot/index.js";
+import { CopilotPanel, type CopilotTab } from "./copilot/index.js";
 import { SettingsPage } from "./settings/SettingsPage.js";
 import { SourcesPanel } from "./sources";
+import { SuggestionsToast } from "./suggest/index.js";
 import { ThemeProvider } from "./theme/ThemeContext.js";
 import { TopBar } from "./topbar/TopBar.js";
 import "./App.css";
@@ -17,6 +18,9 @@ export function App() {
   // Where the BYO-key page returns to when closed (it's opened from both the
   // Copilot CTA and the Settings → API keys page).
   const [byokReturn, setByokReturn] = useState<View>("dashboard");
+  // Which Copilot pane tab is active. Lifted here so the suggestions toast's
+  // "View suggestions" CTA can route the pane to the Suggestions tab.
+  const [copilotTab, setCopilotTab] = useState<CopilotTab>("chat");
 
   const openByok = (from: View) => {
     setByokReturn(from);
@@ -36,8 +40,13 @@ export function App() {
             <div className="app-shell">
               <SourcesPanel />
               <CanvasPanel />
-              <CopilotPanel onConnect={() => openByok("dashboard")} />
+              <CopilotPanel
+                onConnect={() => openByok("dashboard")}
+                tab={copilotTab}
+                onTabChange={setCopilotTab}
+              />
             </div>
+            <SuggestionsToast onView={() => setCopilotTab("suggestions")} />
           </div>
         )}
       </ApiKeyProvider>

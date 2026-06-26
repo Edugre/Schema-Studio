@@ -2,7 +2,6 @@ import { ParseError } from "@schema-studio/core";
 import { useCallback, useRef, useState, type DragEvent, type ReactNode } from "react";
 
 import { useSchemaStore } from "../store/index.js";
-import { JoinSuggestions } from "../suggest/index.js";
 import { ChevronDownIcon, FileIcon, PlusIcon } from "../ui/icons.js";
 import { addSourceFieldToTable, buildTableFromSource, formatSample } from "./buildFromSource.js";
 import "./SourcesPanel.css";
@@ -379,8 +378,6 @@ export function SourcesPanel() {
             </SourceCard>
           ))
         )}
-
-        <JoinSuggestions />
       </div>
 
       {dragActive ? (

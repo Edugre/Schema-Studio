@@ -112,6 +112,25 @@ export function SendIcon(props: IconProps) {
   );
 }
 
+export function XIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </svg>
+  );
+}
+
+/** Side-panel "open panel" glyph — a rounded rect with a right-hand vertical divider. */
+export function PanelOpenIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M15 4v16" />
+    </svg>
+  );
+}
+
 export function KeyIcon(props: IconProps) {
   return (
     <svg {...base(props)}>
