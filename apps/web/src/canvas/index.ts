@@ -5,3 +5,4 @@ export { RelationshipEdge } from "./RelationshipEdge.js";
 export type { RelationshipFlowEdge, RelationshipEdgeData } from "./RelationshipEdge.js";
 export { layoutSchema } from "./layout.js";
 export type { TablePosition } from "./layout.js";
+export { triggerArrange } from "./arrangeBridge.js";

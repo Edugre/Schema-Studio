@@ -3,6 +3,7 @@ import { toDbml, toPrisma, toSql } from "@schema-studio/core";
 import { useMemo, useState } from "react";
 
 import { useSchemaStore } from "../store/index.js";
+import { DownloadIcon } from "../ui/icons.js";
 import "./ExportMenu.css";
 
 type ExportFormat = {
@@ -69,7 +70,8 @@ export function ExportMenu() {
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
       >
-        Export
+        <DownloadIcon size={16} />
+        Export schema
       </button>
 
       {open ? (

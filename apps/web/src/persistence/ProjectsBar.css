@@ -1,32 +1,21 @@
 .projects-bar {
   display: flex;
   align-items: center;
-  gap: 10px;
-  height: 48px;
-  padding: 0 16px;
-  /* Leave the top-right clear for the fixed Export menu. */
-  padding-right: 360px;
-  background: var(--bg-panel);
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.projects-bar__brand {
-  font-size: 0.85rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: var(--text);
+  gap: 8px;
+  min-width: 0;
 }
 
 .projects-bar__select,
 .projects-bar__rename {
-  min-width: 180px;
-  max-width: 260px;
-  padding: 5px 8px;
-  font-size: 0.8rem;
-  border-radius: 6px;
+  min-width: 130px;
+  max-width: 200px;
+  height: 34px;
+  padding: 0 10px;
+  font-size: 13px;
+  border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--surface);
-  color: var(--text-secondary);
+  color: var(--text);
 }
 
 .projects-bar__rename {
@@ -35,23 +24,24 @@
 
 .projects-bar__actions {
   display: flex;
-  gap: 6px;
+  gap: 4px;
 }
 
 .projects-bar__actions button {
-  padding: 5px 10px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  border-radius: 6px;
+  height: 34px;
+  padding: 0 10px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 8px;
   border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text-secondary);
+  background: transparent;
+  color: var(--text);
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .projects-bar__actions button:hover:not(:disabled) {
-  border-color: var(--accent);
-  color: var(--text-strong);
+  background: var(--surface-hover);
 }
 
 .projects-bar__actions button:disabled {

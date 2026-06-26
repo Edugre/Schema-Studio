@@ -1,6 +1,6 @@
 .join-suggestions {
-  margin-top: 20px;
-  border-top: 1px solid #2a2f3a;
+  margin-top: 8px;
+  border-top: 1px solid var(--border-subtle);
   padding-top: 16px;
 }
 
@@ -10,11 +10,11 @@
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 10px;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #9aa3b2;
+  color: var(--text-muted);
 }
 
 .join-suggestions__subtle {
@@ -22,7 +22,7 @@
   font-weight: 500;
   letter-spacing: 0.02em;
   text-transform: none;
-  color: #6b7488;
+  color: var(--text-faint);
 }
 
 .join-suggestions__list {
@@ -35,9 +35,9 @@
 }
 
 .join-suggestions__item {
-  border: 1px solid #2a2f3a;
+  border: 1px solid var(--border-subtle);
   border-radius: 8px;
-  background: #1b2130;
+  background: var(--surface);
   padding: 10px;
 }
 
@@ -50,16 +50,17 @@
 }
 
 .join-suggestions__pair code {
+  font-family: var(--font-mono);
   font-size: 0.72rem;
-  color: #cdd5e4;
-  background: #11151d;
-  border: 1px solid #2a2f3a;
+  color: var(--text-mono);
+  background: var(--surface-strong);
+  border: 1px solid var(--border-subtle);
   border-radius: 4px;
   padding: 1px 5px;
 }
 
 .join-suggestions__arrow {
-  color: #5b8def;
+  color: var(--accent);
 }
 
 .join-suggestions__meta {
@@ -71,17 +72,17 @@
 }
 
 .join-suggestions__overlap {
-  color: #9aa3b2;
+  color: var(--text-muted);
 }
 
 .join-suggestions__grain {
-  color: #8fb3ff;
+  color: var(--accent-text);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
 }
 
 .join-suggestions__warning {
-  color: #f0c14b;
+  color: var(--warning);
 }
 
 /* Space the second section ("Suggested keys") away from the joins list above it. */
@@ -90,19 +91,19 @@
 }
 
 .join-suggestions__apply {
-  padding: 4px 12px;
+  padding: 5px 12px;
   font-size: 0.72rem;
-  font-weight: 600;
-  border-radius: 6px;
-  border: 1px solid #34406b;
-  background: #20283a;
-  color: #8fb3ff;
+  font-weight: 500;
+  border-radius: 8px;
+  border: 1px solid var(--accent-border);
+  background: var(--accent-bg);
+  color: var(--accent-text);
   cursor: pointer;
 }
 
 .join-suggestions__apply:hover {
-  border-color: #5b8def;
-  color: #fff;
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .join-suggestions__message {
@@ -111,9 +112,9 @@
 }
 
 .join-suggestions__message--info {
-  color: #7fd1a8;
+  color: var(--success);
 }
 
 .join-suggestions__message--error {
-  color: #e26b6b;
+  color: var(--danger-text);
 }
