@@ -86,8 +86,12 @@
   background-color: var(--bg-app);
 }
 
+/* Dark tokens. Applied in two cases:
+   1. OS dark + the user hasn't forced light (system / no override).
+   2. The user explicitly chose dark via the Appearance settings.
+   Both blocks are kept identical — edit them together. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg-app: #0a0b0d;
     --topbar-bg: #121316;
     --bg-panel: #191b1f;
@@ -144,6 +148,64 @@
     --shadow-popover: 0 16px 40px rgba(0, 0, 0, 0.5);
     --ring-proposed: 0 0 0 3px #241a4a, 0 1px 2px rgba(0, 0, 0, 0.4);
   }
+}
+
+:root[data-theme="dark"] {
+  --bg-app: #0a0b0d;
+  --topbar-bg: #121316;
+  --bg-panel: #191b1f;
+  --surface: #121316;
+  --surface-strong: #23262b;
+  --surface-sunken: #23262b;
+  --surface-hover: #1e2125;
+
+  --border: #454a50;
+  --border-subtle: #30343a;
+  --row-divider: #23262b;
+
+  --text: #f4f6f8;
+  --text-mono: #e9ecef;
+  --text-secondary: #e9ecef;
+  --text-muted: #9aa1a8;
+  --text-faint: #757c84;
+  --text-dim: #757c84;
+  --text-strong: #ffffff;
+
+  --accent: #7c5ce0;
+  --accent-soft: #7c5ce0;
+  --accent-text: #b7a6f2;
+  --accent-bg: #241a4a;
+  --accent-border: #52399e;
+  --on-accent: #ffffff;
+
+  --pk: #e9ecef;
+
+  --warning: #c99a3a;
+  --caution-bg: #332406;
+  --caution-border: #b8801f;
+  --caution-text: #d9a648;
+
+  --danger: #e26b6b;
+  --danger-text: #f0a0a0;
+  --danger-bg: rgba(220, 80, 80, 0.12);
+  --danger-border: rgba(220, 80, 80, 0.35);
+
+  --fk-border: #30343a;
+
+  --edge: #454a50;
+  --edge-proposed: #7c5ce0;
+
+  --privacy-bg: #13202f;
+  --privacy-text: #5a8fd0;
+
+  --success: #2e9b5c;
+
+  --code-chip-bg: #30343a;
+
+  --shadow-frame: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow-node: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-popover: 0 16px 40px rgba(0, 0, 0, 0.5);
+  --ring-proposed: 0 0 0 3px #241a4a, 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
 *,

@@ -184,7 +184,7 @@ export function ByoKeyPage({ onClose }: { onClose: () => void }) {
         <LockIcon size={13} />
         <span>
           {remember
-            ? "Keys are stored in this browser's local storage · revoke anytime in the Copilot pane"
+            ? "Keys are stored in this browser's local storage · manage them in Settings → API keys"
             : "Keys live in memory for this session · enable “Remember” to persist them locally"}
         </span>
       </footer>

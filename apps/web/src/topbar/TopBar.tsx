@@ -2,10 +2,10 @@ import { triggerArrange } from "../canvas/index.js";
 import { ExportMenu } from "../export/index.js";
 import { ProjectsBar } from "../persistence/index.js";
 import { useSchemaStore } from "../store/index.js";
-import { DatabaseIcon, RowsIcon } from "../ui/icons.js";
+import { DatabaseIcon, GearIcon, RowsIcon } from "../ui/icons.js";
 import "./TopBar.css";
 
-export function TopBar() {
+export function TopBar({ onOpenSettings }: { onOpenSettings: () => void }) {
   const tableCount = useSchemaStore((state) => state.schema.tables.length);
 
   return (
@@ -41,6 +41,15 @@ export function TopBar() {
           Auto-arrange
         </button>
         <ExportMenu />
+        <button
+          type="button"
+          className="topbar__icon-btn"
+          onClick={onOpenSettings}
+          aria-label="Settings"
+          title="Settings"
+        >
+          <GearIcon size={18} />
+        </button>
       </div>
     </header>
   );
