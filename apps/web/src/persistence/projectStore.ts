@@ -1,4 +1,4 @@
-import type { KeyValueStore, ProjectMeta, ProjectRecord } from "./types.js";
+import type { KeyValueStore, ProjectMeta, ProjectRecord, ProjectSummary } from "./types.js";
 
 const PROJECT_PREFIX = "project:";
 const ACTIVE_KEY = "meta:activeId";
@@ -14,14 +14,32 @@ export function toMeta(record: ProjectRecord): ProjectMeta {
   };
 }
 
-/** All projects' metadata, most recently updated first. */
-export async function listProjects(kv: KeyValueStore): Promise<ProjectMeta[]> {
+export function toSummary(record: ProjectRecord): ProjectSummary {
+  return {
+    ...toMeta(record),
+    fileNames: record.sources.map((source) => source.name),
+    tableCount: record.schema.tables.length,
+    relationshipCount: record.schema.relationships.length,
+  };
+}
+
+/** Read every stored record once, newest first. Shared by the meta/summary listings below. */
+async function readAllRecords(kv: KeyValueStore): Promise<ProjectRecord[]> {
   const keys = (await kv.keys()).filter((key) => key.startsWith(PROJECT_PREFIX));
   const records = await Promise.all(keys.map((key) => kv.get<ProjectRecord>(key)));
   return records
     .filter((record): record is ProjectRecord => record !== undefined)
-    .map(toMeta)
     .sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+/** All projects' metadata, most recently updated first. */
+export async function listProjects(kv: KeyValueStore): Promise<ProjectMeta[]> {
+  return (await readAllRecords(kv)).map(toMeta);
+}
+
+/** All projects' summaries (metadata + Home-grid display fields), most recently updated first. */
+export async function listProjectSummaries(kv: KeyValueStore): Promise<ProjectSummary[]> {
+  return (await readAllRecords(kv)).map(toSummary);
 }
 
 export async function loadProjectRecord(

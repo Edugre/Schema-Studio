@@ -9,12 +9,13 @@ import {
   deleteProjectRecord,
   getActiveProjectId,
   listProjects,
+  listProjectSummaries,
   loadProjectRecord,
   saveProjectRecord,
   setActiveProjectId,
 } from "./projectStore.js";
 import { parseProjectFile, serializeProjectFile } from "./serialize.js";
-import type { KeyValueStore, ProjectMeta, ProjectRecord } from "./types.js";
+import type { KeyValueStore, ProjectMeta, ProjectRecord, ProjectSummary } from "./types.js";
 
 const AUTOSAVE_DELAY = 500;
 const DEFAULT_NAME = "Untitled project";
@@ -33,6 +34,8 @@ function newRecord(
 
 export type UseProjects = {
   projects: ProjectMeta[];
+  /** Same list enriched with the Home-grid display fields (file chips, counts). */
+  summaries: ProjectSummary[];
   activeId: string | undefined;
   ready: boolean;
   error: string | undefined;
@@ -60,6 +63,7 @@ export function useProjects(
   const kv = kvRef.current;
 
   const [projects, setProjects] = useState<ProjectMeta[]>([]);
+  const [summaries, setSummaries] = useState<ProjectSummary[]>([]);
   const [activeId, setActiveIdState] = useState<string | undefined>(undefined);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
@@ -73,7 +77,10 @@ export function useProjects(
   }, []);
 
   const refreshList = useCallback(async () => {
-    setProjects(await listProjects(kv));
+    // One read of every record yields both lists (summaries are a superset of meta).
+    const list = await listProjectSummaries(kv);
+    setSummaries(list);
+    setProjects(list);
   }, [kv]);
 
   // Imperative flush of any pending autosave. Set by the autosave effect; called before a
@@ -302,6 +309,7 @@ export function useProjects(
 
   return {
     projects,
+    summaries,
     activeId,
     ready,
     error,

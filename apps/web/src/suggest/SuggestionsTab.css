@@ -1,0 +1,251 @@
+/* Copilot pane → "Suggestions" tab (handoff: design_handoff_suggestions +
+   design_handoff_active_suggestion_preview). Collapsible accordion cards. */
+
+.copilot-suggest-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.copilot-suggest-help {
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-muted);
+}
+
+.copilot-suggest-message {
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.copilot-suggest-message--info {
+  color: var(--text-muted);
+}
+
+.copilot-suggest-message--error {
+  color: var(--danger-text);
+}
+
+/* ---- Group ---- */
+.copilot-suggest-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.copilot-suggest-grouphead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.copilot-suggest-grouphead__label {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--text-faint);
+}
+
+.copilot-suggest-grouphead__count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.copilot-suggest-grouphead__rule {
+  flex: 1;
+  height: 1px;
+  background: var(--border-subtle);
+}
+
+/* ---- Collapsible card ---- */
+.copilot-suggest-card {
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  overflow: hidden;
+  transition:
+    background 0.14s ease,
+    border-color 0.14s ease;
+}
+
+.copilot-suggest-card.is-open {
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
+}
+
+.copilot-suggest-card__header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 11px 12px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.copilot-suggest-card__dot {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--pk);
+}
+
+.copilot-suggest-card__icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  color: var(--accent-text);
+}
+
+.copilot-suggest-card__title {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Once open, the card owns the full title — let it wrap instead of truncating. */
+.copilot-suggest-card.is-open .copilot-suggest-card__header {
+  align-items: flex-start;
+}
+
+.copilot-suggest-card.is-open .copilot-suggest-card__title {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.copilot-suggest-card__title code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: -0.01em;
+}
+
+.copilot-suggest-card__chevron {
+  flex: 0 0 auto;
+  color: var(--text-faint);
+  transition: transform 0.16s ease;
+}
+
+.copilot-suggest-card.is-open .copilot-suggest-card__chevron {
+  transform: rotate(180deg);
+}
+
+.copilot-suggest-card__body {
+  padding: 0 12px 12px 27px;
+}
+
+.copilot-suggest-card__detail {
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--text-muted);
+}
+
+.copilot-suggest-card__detail code {
+  font-family: var(--font-mono);
+}
+
+.copilot-suggest-card__note {
+  margin: 8px 0 0;
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--caution-text);
+}
+
+.copilot-suggest-card__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 11px;
+}
+
+/* ---- Buttons (shared by cards + footer) ---- */
+.copilot-suggest-btn {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.copilot-suggest-btn--ghost {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-faint);
+}
+
+.copilot-suggest-btn--ghost:hover {
+  color: var(--text);
+}
+
+.copilot-suggest-btn--primary {
+  padding: 0 14px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.copilot-suggest-btn--primary:hover {
+  filter: brightness(0.94);
+}
+
+/* ---- Footer ---- */
+.copilot-suggest-footer {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--surface);
+}
+
+.copilot-suggest-footer__status {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.copilot-suggest-amber {
+  color: var(--caution-text);
+}
+
+.copilot-suggest-footer__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.copilot-suggest-footer .copilot-suggest-btn {
+  height: 32px;
+}
+
+.copilot-suggest-footer .copilot-suggest-btn--ghost {
+  border-color: var(--border-subtle);
+  color: var(--text);
+}
+
+.copilot-suggest-footer .copilot-suggest-btn--primary {
+  white-space: nowrap;
+}

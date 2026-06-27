@@ -5,18 +5,29 @@ import { useSchemaStore } from "../store/index.js";
 import { DatabaseIcon, GearIcon, RowsIcon } from "../ui/icons.js";
 import "./TopBar.css";
 
-export function TopBar({ onOpenSettings }: { onOpenSettings: () => void }) {
+export function TopBar({
+  onOpenHome,
+  onOpenSettings,
+}: {
+  onOpenHome: () => void;
+  onOpenSettings: () => void;
+}) {
   const tableCount = useSchemaStore((state) => state.schema.tables.length);
 
   return (
     <header className="topbar">
       <div className="topbar__left">
-        <div className="topbar__brand">
+        <button
+          type="button"
+          className="topbar__brand"
+          onClick={onOpenHome}
+          title="Back to projects"
+        >
           <span className="topbar__logo" aria-hidden>
             <DatabaseIcon size={14} />
           </span>
           <span className="topbar__wordmark">Schema Studio</span>
-        </div>
+        </button>
       </div>
 
       <div className="topbar__right">

@@ -10,16 +10,19 @@ import {
 } from "@xyflow/react";
 import type { Connection, EdgeChange, NodeChange, ReactFlowInstance } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import { useSchemaStore } from "../store/index.js";
-import { PlusIcon, RedoIcon, UndoIcon } from "../ui/icons.js";
+import { useSuggestions } from "../suggest/index.js";
+import { ChevronLeftIcon, PlusIcon, RedoIcon, UndoIcon } from "../ui/icons.js";
+import { PreviewOverlay } from "./PreviewOverlay.js";
 import { registerArrangeHandler } from "./arrangeBridge.js";
 import { RelationshipEdge } from "./RelationshipEdge.js";
 import type { RelationshipFlowEdge } from "./RelationshipEdge.js";
 import { TableNode } from "./TableNode.js";
 import type { TableFlowNode } from "./TableNode.js";
 import { layoutSchema } from "./layout.js";
+import { buildSuggestionPreview } from "./suggestionPreview.js";
 
 const nodeTypes = { table: TableNode };
 const edgeTypes = { relationship: RelationshipEdge };
@@ -39,10 +42,30 @@ function uniqueTableName(existing: ReadonlySet<string>): string {
   return name;
 }
 
-export function CanvasPanel() {
-  const tables = useSchemaStore((state) => state.schema.tables);
-  const relationships = useSchemaStore((state) => state.schema.relationships);
+export function CanvasPanel({
+  activeSuggestionId,
+  onBack,
+}: {
+  activeSuggestionId: string | null;
+  onBack: () => void;
+}) {
+  const schema = useSchemaStore((state) => state.schema);
+  const tables = schema.tables;
+  const relationships = schema.relationships;
+  const selectedTableId = useSchemaStore((state) => state.selection.tableId);
+  const { open: openSuggestions } = useSuggestions();
 
+  // Resolve the active suggestion to canvas geometry. Null when nothing is active or the
+  // suggestion's tables/fields aren't on the canvas (e.g. a join whose tables aren't built yet).
+  const preview = useMemo(() => {
+    if (!activeSuggestionId) {
+      return null;
+    }
+    const item = openSuggestions.find((suggestion) => suggestion.id === activeSuggestionId);
+    return item ? buildSuggestionPreview(item, schema) : null;
+  }, [activeSuggestionId, openSuggestions, schema]);
+
+  const selectTable = useSchemaStore((state) => state.selectTable);
   const moveTable = useSchemaStore((state) => state.moveTable);
   const moveTables = useSchemaStore((state) => state.moveTables);
   const removeTable = useSchemaStore((state) => state.removeTable);
@@ -62,19 +85,18 @@ export function CanvasPanel() {
   // The store owns structure + positions; ReactFlow's local arrays carry only the
   // ephemeral selection/measured-size state, which we preserve on each re-derive.
   useEffect(() => {
-    setNodes((prev) =>
-      tables.map((table) => {
-        const existing = prev.find((node) => node.id === table.id);
-        return {
-          id: table.id,
-          type: "table" as const,
-          position: { x: table.x, y: table.y },
-          data: { table },
-          selected: existing?.selected ?? false,
-        };
-      }),
+    setNodes(
+      tables.map((table) => ({
+        id: table.id,
+        type: "table" as const,
+        position: { x: table.x, y: table.y },
+        data: { table },
+        // The active table (store selection) is the canvas's selected node, so picking it here
+        // or from the Sources panel highlights the same card.
+        selected: table.id === selectedTableId,
+      })),
     );
-  }, [tables, setNodes]);
+  }, [tables, selectedTableId, setNodes]);
 
   useEffect(() => {
     setEdges((prev) =>
@@ -164,12 +186,24 @@ export function CanvasPanel() {
   return (
     <section className="panel canvas-panel">
       <div className="panel-body">
-        <div className="canvas-chip">
-          <span className="canvas-chip__label">Inferred schema</span>
-          <span className="canvas-chip__count">
-            {tableCount} {tableCount === 1 ? "table" : "tables"} · {relationshipCount}{" "}
-            {relationshipCount === 1 ? "relationship" : "relationships"}
-          </span>
+        <div className="canvas-status">
+          <button type="button" className="canvas-back" onClick={onBack} title="Back to projects">
+            <ChevronLeftIcon size={15} />
+            Projects
+          </button>
+          <div className="canvas-chip">
+            <span className="canvas-chip__label">Inferred schema</span>
+            <span className="canvas-chip__count">
+              {tableCount} {tableCount === 1 ? "table" : "tables"} · {relationshipCount}{" "}
+              {relationshipCount === 1 ? "relationship" : "relationships"}
+            </span>
+          </div>
+          {preview ? (
+            <span className="canvas-preview-pill">
+              <span className="canvas-preview-pill__dot" aria-hidden />
+              Previewing — not yet applied
+            </span>
+          ) : null}
         </div>
         <div className="canvas-tools">
           <button
@@ -213,6 +247,8 @@ export function CanvasPanel() {
           onNodesChange={handleNodesChange}
           onEdgesChange={handleEdgesChange}
           onConnect={onConnect}
+          onNodeClick={(_, node) => selectTable(node.id)}
+          onPaneClick={() => selectTable(undefined)}
           onInit={(instance) => {
             instanceRef.current = instance;
           }}
@@ -222,6 +258,7 @@ export function CanvasPanel() {
           <Background variant={BackgroundVariant.Dots} gap={24} size={1} />
           <Controls />
           <MiniMap pannable zoomable />
+          {preview ? <PreviewOverlay preview={preview} /> : null}
         </ReactFlow>
       </div>
     </section>

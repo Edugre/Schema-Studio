@@ -60,6 +60,24 @@ export function PlusIcon(props: IconProps) {
   );
 }
 
+export function SearchIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m21 21-4.3-4.3" />
+    </svg>
+  );
+}
+
+export function UserIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  );
+}
+
 export function FileIcon(props: IconProps) {
   return (
     <svg {...base(props)}>
@@ -108,6 +126,36 @@ export function SendIcon(props: IconProps) {
     <svg {...base(props)}>
       <path d="M22 2 11 13" />
       <path d="M22 2 15 22l-4-9-9-4z" />
+    </svg>
+  );
+}
+
+export function XIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </svg>
+  );
+}
+
+/** Side-panel "open panel" glyph — a rounded rect with a right-hand vertical divider. */
+export function PanelOpenIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M15 4v16" />
+    </svg>
+  );
+}
+
+/** Lucide "link-2" — used as the FK / relationship leading indicator. */
+export function LinkIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M9 17H7A5 5 0 0 1 7 7h2" />
+      <path d="M15 7h2a5 5 0 0 1 0 10h-2" />
+      <path d="M8 12h8" />
     </svg>
   );
 }

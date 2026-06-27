@@ -1,9 +1,8 @@
 import { ParseError } from "@schema-studio/core";
-import { useCallback, useRef, useState, type DragEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
 
 import { useSchemaStore } from "../store/index.js";
-import { JoinSuggestions } from "../suggest/index.js";
-import { ChevronDownIcon, FileIcon, PlusIcon } from "../ui/icons.js";
+import { ChevronDownIcon, FileIcon, PanelOpenIcon, PlusIcon } from "../ui/icons.js";
 import { addSourceFieldToTable, buildTableFromSource, formatSample } from "./buildFromSource.js";
 import "./SourcesPanel.css";
 import { readAndParseFile } from "./readAndParse.js";
@@ -21,6 +20,8 @@ function SourceCard({
   name,
   kind,
   fieldCount,
+  expanded,
+  onToggle,
   onBuildTable,
   onRemove,
   children,
@@ -29,12 +30,12 @@ function SourceCard({
   name: string;
   kind: string;
   fieldCount: number;
+  expanded: boolean;
+  onToggle: () => void;
   onBuildTable: () => void;
   onRemove: () => void;
   children: ReactNode;
 }) {
-  const [expanded, setExpanded] = useState(true);
-
   const meta = `${kind.toUpperCase()} · ${fieldCount} fields`;
 
   return (
@@ -45,7 +46,7 @@ function SourceCard({
       <button
         type="button"
         className="sources-panel__source-header"
-        onClick={() => setExpanded((value) => !value)}
+        onClick={onToggle}
         aria-expanded={expanded}
       >
         <span className="sources-panel__source-icon">
@@ -81,7 +82,13 @@ function SourceCard({
   );
 }
 
-export function SourcesPanel() {
+export function SourcesPanel({
+  collapsed,
+  onToggleCollapse,
+}: {
+  collapsed: boolean;
+  onToggleCollapse: () => void;
+}) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Tracks drag enter/leave depth so the overlay doesn't flicker as the cursor
   // moves between the pane and its nested children.
@@ -89,6 +96,9 @@ export function SourcesPanel() {
   const [dragActive, setDragActive] = useState(false);
   const [message, setMessage] = useState<PanelMessage>(null);
   const [busy, setBusy] = useState(false);
+  // Accordion: at most one source expanded at a time. `null` means all collapsed.
+  const [expandedSourceId, setExpandedSourceId] = useState<string | null>(null);
+  const didDefaultExpand = useRef(false);
 
   const sources = useSchemaStore((state) => state.sources);
   const schema = useSchemaStore((state) => state.schema);
@@ -102,6 +112,18 @@ export function SourcesPanel() {
   const activeTable = selection.tableId
     ? schema.tables.find((table) => table.id === selection.tableId)
     : undefined;
+
+  // Open the first source once, when sources first load, so the panel isn't all-collapsed.
+  useEffect(() => {
+    if (!didDefaultExpand.current && sources.length > 0) {
+      didDefaultExpand.current = true;
+      setExpandedSourceId(sources[0]!.id);
+    }
+  }, [sources]);
+
+  const toggleSource = (sourceId: string) => {
+    setExpandedSourceId((current) => (current === sourceId ? null : sourceId));
+  };
 
   const ingestFiles = useCallback(
     async (files: FileList | File[]) => {
@@ -236,6 +258,23 @@ export function SourcesPanel() {
     void ingestFiles(event.dataTransfer.files);
   };
 
+  if (collapsed) {
+    return (
+      <aside className="panel panel-rail">
+        <button
+          type="button"
+          className="panel-rail__btn"
+          onClick={onToggleCollapse}
+          title="Expand sources"
+          aria-label="Expand sources panel"
+        >
+          <PanelOpenIcon size={16} />
+        </button>
+        <span className="panel-rail__label">Sources</span>
+      </aside>
+    );
+  }
+
   return (
     <section
       className="panel sources-panel"
@@ -251,16 +290,27 @@ export function SourcesPanel() {
             {sources.length} {sources.length === 1 ? "file" : "files"}
           </span>
         </div>
-        <button
-          type="button"
-          className="sources-panel__add"
-          onClick={openFilePicker}
-          disabled={busy}
-          aria-label="Add source file"
-          title="Add a local file"
-        >
-          <PlusIcon size={16} />
-        </button>
+        <div className="sources-panel__header-actions">
+          <button
+            type="button"
+            className="sources-panel__add"
+            onClick={openFilePicker}
+            disabled={busy}
+            aria-label="Add source file"
+            title="Add a local file"
+          >
+            <PlusIcon size={16} />
+          </button>
+          <button
+            type="button"
+            className="sources-panel__add"
+            onClick={onToggleCollapse}
+            aria-label="Collapse sources panel"
+            title="Collapse panel"
+          >
+            <PanelOpenIcon size={16} />
+          </button>
+        </div>
       </header>
       <div className="panel-body">
         {sources.length === 0 ? (
@@ -342,6 +392,8 @@ export function SourcesPanel() {
               name={source.name}
               kind={source.kind}
               fieldCount={source.fields.length}
+              expanded={expandedSourceId === source.id}
+              onToggle={() => toggleSource(source.id)}
               onBuildTable={() => handleBuildTable(source.id)}
               onRemove={() => removeSource(source.id)}
             >
@@ -379,8 +431,6 @@ export function SourcesPanel() {
             </SourceCard>
           ))
         )}
-
-        <JoinSuggestions />
       </div>
 
       {dragActive ? (

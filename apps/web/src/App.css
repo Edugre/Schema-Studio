@@ -26,6 +26,42 @@
   border-left: 1px solid var(--border-subtle);
 }
 
+/* Collapsed side panel — a thin rail with an expand button and a vertical label. */
+.panel-rail {
+  align-items: center;
+  padding: 12px 0;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.panel-rail__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.panel-rail__btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.panel-rail__label {
+  writing-mode: vertical-rl;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  user-select: none;
+}
+
 .panel-header {
   padding: 12px 16px;
   font-size: 0.75rem;
@@ -59,6 +95,69 @@
   width: 100%;
   height: 100%;
   --xy-background-pattern-color: var(--border);
+}
+
+/* Status row: the "Inferred schema" chip plus the optional preview pill, side by side. */
+.canvas-status {
+  position: absolute;
+  top: 14px;
+  left: 16px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.canvas-status .canvas-chip {
+  position: static;
+  top: auto;
+  left: auto;
+  z-index: auto;
+}
+
+.canvas-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 12px 0 9px;
+  border-radius: 9999px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface);
+  box-shadow: var(--shadow-node);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.canvas-back:hover {
+  background: var(--surface-hover);
+  border-color: var(--border);
+}
+
+.canvas-preview-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 28px;
+  padding: 0 13px;
+  border-radius: 9999px;
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  color: var(--accent-text);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: var(--shadow-node);
+}
+
+.canvas-preview-pill__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 9999px;
+  background: var(--accent);
 }
 
 .canvas-chip {

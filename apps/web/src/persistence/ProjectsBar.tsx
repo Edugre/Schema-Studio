@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import { useProjects } from "./useProjects.js";
+import { useProjectsContext } from "./ProjectsContext.js";
 import "./ProjectsBar.css";
 
 export function ProjectsBar() {
@@ -11,12 +11,11 @@ export function ProjectsBar() {
     error,
     dismissError,
     newProject,
-    openProject,
     deleteProject,
     renameProject,
     exportProject,
     importProject,
-  } = useProjects();
+  } = useProjectsContext();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [renaming, setRenaming] = useState(false);
@@ -63,30 +62,20 @@ export function ProjectsBar() {
           }}
         />
       ) : (
-        <select
-          className="projects-bar__select"
-          value={activeId ?? ""}
+        // Project switching now happens from the Home screen; the editor just shows the active
+        // project's name (click to rename).
+        <button
+          type="button"
+          className="projects-bar__name"
+          onClick={() => setRenaming(true)}
           disabled={!ready}
-          onChange={(event) => openProject(event.target.value)}
-          aria-label="Active project"
+          title="Rename project"
         >
-          {projects.map((project) => (
-            <option key={project.id} value={project.id}>
-              {project.name}
-            </option>
-          ))}
-        </select>
+          {active?.name ?? "Untitled project"}
+        </button>
       )}
 
       <div className="projects-bar__actions">
-        <button
-          type="button"
-          onClick={() => setRenaming(true)}
-          disabled={!ready || renaming}
-          title="Rename project"
-        >
-          Rename
-        </button>
         <button type="button" onClick={newProject} disabled={!ready} title="New project">
           New
         </button>

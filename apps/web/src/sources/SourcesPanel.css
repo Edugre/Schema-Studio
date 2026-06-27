@@ -30,6 +30,13 @@
   color: var(--text-muted);
 }
 
+.sources-panel__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
 .sources-panel__add {
   display: inline-flex;
   align-items: center;
@@ -59,6 +66,13 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Don't let a long field list lock the panel's scroll into the card; the whole body scrolls. */
+.sources-panel__source {
+  flex-shrink: 0;
 }
 
 .sources-panel__dropzone {

@@ -25,6 +25,12 @@ export type SchemaStore = {
   sources: Source[];
   selection: Selection;
   chat: ChatMessage[];
+  /**
+   * IDs of content-aware suggestions the user has dismissed (see `suggest/useSuggestions`).
+   * Ephemeral UI state shared by the Copilot Suggestions tab and the nudge toast so their
+   * counts stay in sync; deliberately kept out of undo/redo and not persisted.
+   */
+  dismissedSuggestionIds: string[];
 
   runActions: (rawActions: unknown[]) => RunActionsResult;
 
@@ -56,6 +62,8 @@ export type SchemaStore = {
 
   appendChatMessages: (messages: ChatMessage[]) => void;
   clearChat: () => void;
+
+  dismissSuggestions: (ids: string[]) => void;
 
   loadProject: (schema: Schema, sources: Source[], chat?: ChatMessage[]) => void;
 
@@ -158,6 +166,7 @@ export function createSchemaStore(options?: CreateSchemaStoreOptions) {
         sources: options?.initialSources ?? [],
         selection: {},
         chat: options?.initialChat ?? [],
+        dismissedSuggestionIds: [],
         _history: createHistoryController(),
         _makeId: makeId,
 
@@ -412,6 +421,23 @@ export function createSchemaStore(options?: CreateSchemaStoreOptions) {
           });
         },
 
+        // Hide one or more suggestions without applying them. Not part of undo/redo —
+        // dismissing a nudge shouldn't be entangled with schema history.
+        dismissSuggestions: (ids) => {
+          if (ids.length === 0) {
+            return;
+          }
+          set((draft) => {
+            const seen = new Set(draft.dismissedSuggestionIds);
+            for (const id of ids) {
+              if (!seen.has(id)) {
+                seen.add(id);
+                draft.dismissedSuggestionIds.push(id);
+              }
+            }
+          });
+        },
+
         // Replace the entire working set when switching local projects. History is
         // reset so undo never crosses a project boundary.
         loadProject: (schema, sources, chat = []) => {
@@ -420,6 +446,7 @@ export function createSchemaStore(options?: CreateSchemaStoreOptions) {
             draft.sources = structuredClone(sources);
             draft.chat = structuredClone(chat);
             draft.selection = {};
+            draft.dismissedSuggestionIds = [];
             draft._history = createHistoryController();
           });
         },
