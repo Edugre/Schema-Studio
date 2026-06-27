@@ -29,6 +29,9 @@ export function App() {
   // The expanded suggestion card (single-open accordion), shared with the canvas so it can
   // preview the active suggestion. Cleared when leaving the Suggestions tab.
   const [activeSuggestionId, setActiveSuggestionId] = useState<string | null>(null);
+  // Side-panel collapse: collapsed panels shrink to a thin rail so the canvas gets more room.
+  const [sourcesCollapsed, setSourcesCollapsed] = useState(false);
+  const [copilotCollapsed, setCopilotCollapsed] = useState(false);
 
   const openByok = (from: View) => {
     setByokReturn(from);
@@ -69,10 +72,21 @@ export function App() {
                 onOpenHome={() => setView("home")}
                 onOpenSettings={() => openSettings("dashboard")}
               />
-              <div className="app-shell">
-                <SourcesPanel />
+              <div
+                className="app-shell"
+                style={{
+                  gridTemplateColumns: `${sourcesCollapsed ? "48px" : "288px"} 1fr ${
+                    copilotCollapsed ? "48px" : "372px"
+                  }`,
+                }}
+              >
+                <SourcesPanel
+                  collapsed={sourcesCollapsed}
+                  onToggleCollapse={() => setSourcesCollapsed((value) => !value)}
+                />
                 <CanvasPanel
                   activeSuggestionId={copilotTab === "suggestions" ? activeSuggestionId : null}
+                  onBack={() => setView("home")}
                 />
                 <CopilotPanel
                   onConnect={() => openByok("dashboard")}
@@ -80,6 +94,8 @@ export function App() {
                   onTabChange={changeCopilotTab}
                   activeSuggestionId={activeSuggestionId}
                   onActivateSuggestion={setActiveSuggestionId}
+                  collapsed={copilotCollapsed}
+                  onToggleCollapse={() => setCopilotCollapsed((value) => !value)}
                 />
               </div>
               <SuggestionsToast onView={() => changeCopilotTab("suggestions")} />

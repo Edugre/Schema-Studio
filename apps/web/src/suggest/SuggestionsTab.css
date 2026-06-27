@@ -120,6 +120,18 @@
   white-space: nowrap;
 }
 
+/* Once open, the card owns the full title — let it wrap instead of truncating. */
+.copilot-suggest-card.is-open .copilot-suggest-card__header {
+  align-items: flex-start;
+}
+
+.copilot-suggest-card.is-open .copilot-suggest-card__title {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .copilot-suggest-card__title code {
   font-family: var(--font-mono);
   font-size: 12px;

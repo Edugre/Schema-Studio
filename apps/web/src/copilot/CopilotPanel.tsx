@@ -4,7 +4,15 @@ import { useMemo, useRef, useState } from "react";
 import { AnthropicBrowserProvider } from "../ai/AnthropicBrowserProvider.js";
 import { useSchemaStore } from "../store/index.js";
 import { SuggestionsTab, useSuggestions } from "../suggest/index.js";
-import { CheckIcon, DownloadIcon, InfoIcon, LockIcon, SendIcon, SparkleIcon } from "../ui/icons.js";
+import {
+  CheckIcon,
+  DownloadIcon,
+  InfoIcon,
+  LockIcon,
+  PanelOpenIcon,
+  SendIcon,
+  SparkleIcon,
+} from "../ui/icons.js";
 import { useApiKeyContext } from "./ApiKeyContext.js";
 import "./CopilotPanel.css";
 import { Markdown } from "./Markdown.js";
@@ -40,12 +48,16 @@ export function CopilotPanel({
   onTabChange,
   activeSuggestionId,
   onActivateSuggestion,
+  collapsed,
+  onToggleCollapse,
 }: {
   onConnect: () => void;
   tab: CopilotTab;
   onTabChange: (tab: CopilotTab) => void;
   activeSuggestionId: string | null;
   onActivateSuggestion: (id: string | null) => void;
+  collapsed: boolean;
+  onToggleCollapse: () => void;
 }) {
   const { apiKey } = useApiKeyContext();
   const suggestions = useSuggestions();
@@ -164,6 +176,23 @@ export function CopilotPanel({
   const showTabs = suggestions.openCount > 0;
   const activeTab: CopilotTab = showTabs ? tab : "chat";
 
+  if (collapsed) {
+    return (
+      <aside className="panel panel-rail">
+        <button
+          type="button"
+          className="panel-rail__btn"
+          onClick={onToggleCollapse}
+          title="Expand Copilot"
+          aria-label="Expand Copilot panel"
+        >
+          <PanelOpenIcon size={16} />
+        </button>
+        <span className="panel-rail__label">Copilot</span>
+      </aside>
+    );
+  }
+
   return (
     <section className="panel copilot-panel">
       <header className="copilot-header">
@@ -171,7 +200,15 @@ export function CopilotPanel({
           <SparkleIcon size={14} />
         </span>
         <h1 className="copilot-header__title">Copilot</h1>
-        <span className="copilot-header__tag">SS-9 detector</span>
+        <button
+          type="button"
+          className="copilot-header__collapse"
+          onClick={onToggleCollapse}
+          aria-label="Collapse Copilot panel"
+          title="Collapse panel"
+        >
+          <PanelOpenIcon size={16} />
+        </button>
       </header>
       <div className="panel-body">
         {showTabs ? (

@@ -26,6 +26,42 @@
   border-left: 1px solid var(--border-subtle);
 }
 
+/* Collapsed side panel — a thin rail with an expand button and a vertical label. */
+.panel-rail {
+  align-items: center;
+  padding: 12px 0;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.panel-rail__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.panel-rail__btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.panel-rail__label {
+  writing-mode: vertical-rl;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  user-select: none;
+}
+
 .panel-header {
   padding: 12px 16px;
   font-size: 0.75rem;
@@ -77,6 +113,28 @@
   top: auto;
   left: auto;
   z-index: auto;
+}
+
+.canvas-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 12px 0 9px;
+  border-radius: 9999px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface);
+  box-shadow: var(--shadow-node);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.canvas-back:hover {
+  background: var(--surface-hover);
+  border-color: var(--border);
 }
 
 .canvas-preview-pill {

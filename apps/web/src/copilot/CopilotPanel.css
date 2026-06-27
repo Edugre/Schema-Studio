@@ -25,11 +25,23 @@
   color: var(--text);
 }
 
-.copilot-header__tag {
+.copilot-header__collapse {
   margin-left: auto;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--text-faint);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.copilot-header__collapse:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 /* ---- Tab bar (Chat / Suggestions) ---- */
