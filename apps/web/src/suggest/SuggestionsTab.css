@@ -150,6 +150,13 @@
   font-family: var(--font-mono);
 }
 
+.copilot-suggest-card__note {
+  margin: 8px 0 0;
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--caution-text);
+}
+
 .copilot-suggest-card__actions {
   display: flex;
   justify-content: flex-end;

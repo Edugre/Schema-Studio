@@ -2,7 +2,7 @@ import type { Schema, Table } from "@schema-studio/core";
 
 import { tableNameFromFilename } from "../sources/tableName.js";
 import type { SuggestionItem } from "../suggest/index.js";
-import { FIELD_ROW_HEIGHT, HEADER_HEIGHT, NODE_WIDTH } from "./constants.js";
+import { FIELD_ROW_HEIGHT, HEADER_HEIGHT, NODE_BORDER, NODE_WIDTH } from "./constants.js";
 
 /**
  * Resolves an active suggestion to the geometry needed to preview it on the canvas — ring rects
@@ -27,7 +27,15 @@ export type SuggestionPreview = {
 
 type FieldLocation = { table: Table; rowIndex: number };
 
-const nameEq = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+/**
+ * Loose field-name comparison. Join candidates carry the *raw source column* name (e.g. `ceID`,
+ * `Health Center Number`), while the canvas often holds a remodeled schema with snake_case fields
+ * (`ce_id`, `health_center_number`). Collapsing case + separators lets the preview locate a field
+ * that differs only in formatting; genuinely renamed fields still won't match (handled by the
+ * caller falling back to "can't preview").
+ */
+const normalizeName = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
+const nameEq = (a: string, b: string) => normalizeName(a) === normalizeName(b);
 
 /** Find a field on a named table. */
 function locate(schema: Schema, tableName: string, fieldName: string): FieldLocation | null {
@@ -57,7 +65,8 @@ function locateByField(schema: Schema, fieldName: string, hint: string): FieldLo
 }
 
 function rowTop(loc: FieldLocation): number {
-  return loc.table.y + HEADER_HEIGHT + loc.rowIndex * FIELD_ROW_HEIGHT;
+  // table.y is the node's border-box top, so step past the 1px border and the header to the row.
+  return loc.table.y + NODE_BORDER + HEADER_HEIGHT + loc.rowIndex * FIELD_ROW_HEIGHT;
 }
 
 /** A rectangle hugging a field row, inset ~3px outside it. */

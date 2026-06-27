@@ -4,7 +4,10 @@
  * actually paints, so nodes don't overlap after "Auto-arrange".
  */
 export const NODE_WIDTH = 220;
-export const HEADER_HEIGHT = 40;
+/** The 1px border drawn around `.table-node`; React Flow positions the node at its border box. */
+export const NODE_BORDER = 1;
+/** Matches `.table-node__title { height: 44px }` in App.css. */
+export const HEADER_HEIGHT = 44;
 export const FIELD_ROW_HEIGHT = 30;
 export const ADD_FIELD_HEIGHT = 34;
 

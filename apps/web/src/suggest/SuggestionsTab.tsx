@@ -1,5 +1,7 @@
 import { useState } from "react";
 
+import { buildSuggestionPreview } from "../canvas/suggestionPreview.js";
+import { useSchemaStore } from "../store/index.js";
 import { ChevronDownIcon, LinkIcon } from "../ui/icons.js";
 import type { SuggestionItem, SuggestionsApi } from "./useSuggestions.js";
 import "./SuggestionsTab.css";
@@ -23,6 +25,7 @@ export function SuggestionsTab({
   onActivate: (id: string | null) => void;
 }) {
   const { groups, openCount, needsReviewCount } = api;
+  const schema = useSchemaStore((state) => state.schema);
   const [message, setMessage] = useState<{ kind: "info" | "error"; text: string } | null>(null);
 
   const resolveActive = (id: string) => {
@@ -95,16 +98,24 @@ export function SuggestionsTab({
               <span className="copilot-suggest-grouphead__rule" aria-hidden />
             </header>
 
-            {group.items.map((item) => (
-              <SuggestionCard
-                key={item.id}
-                item={item}
-                open={activeId === item.id}
-                onToggle={() => onActivate(activeId === item.id ? null : item.id)}
-                onApply={() => apply(item)}
-                onDismiss={() => dismiss(item)}
-              />
-            ))}
+            {group.items.map((item) => {
+              const open = activeId === item.id;
+              // When the open card can't be located on the canvas (e.g. a join described in raw
+              // source-column names against a remodeled schema), the overlay shows nothing — say so
+              // on the card rather than leaving the canvas silently blank.
+              const unpreviewable = open && buildSuggestionPreview(item, schema) === null;
+              return (
+                <SuggestionCard
+                  key={item.id}
+                  item={item}
+                  open={open}
+                  unpreviewable={unpreviewable}
+                  onToggle={() => onActivate(open ? null : item.id)}
+                  onApply={() => apply(item)}
+                  onDismiss={() => dismiss(item)}
+                />
+              );
+            })}
           </section>
         ))}
       </div>
@@ -142,12 +153,14 @@ export function SuggestionsTab({
 function SuggestionCard({
   item,
   open,
+  unpreviewable,
   onToggle,
   onApply,
   onDismiss,
 }: {
   item: SuggestionItem;
   open: boolean;
+  unpreviewable: boolean;
   onToggle: () => void;
   onApply: () => void;
   onDismiss: () => void;
@@ -165,6 +178,12 @@ function SuggestionCard({
       {open ? (
         <div className="copilot-suggest-card__body">
           <div className="copilot-suggest-card__detail">{detailFor(item)}</div>
+          {unpreviewable ? (
+            <p className="copilot-suggest-card__note">
+              These columns aren’t on the canvas under these names, so it can’t be previewed. Apply
+              it to add the link, or rename the fields to match the source.
+            </p>
+          ) : null}
           <div className="copilot-suggest-card__actions">
             <button
               type="button"

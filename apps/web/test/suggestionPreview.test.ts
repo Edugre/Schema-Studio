@@ -1,7 +1,12 @@
 import type { Schema } from "@schema-studio/core";
 import { describe, expect, it } from "vitest";
 
-import { FIELD_ROW_HEIGHT, HEADER_HEIGHT, NODE_WIDTH } from "../src/canvas/constants.js";
+import {
+  FIELD_ROW_HEIGHT,
+  HEADER_HEIGHT,
+  NODE_BORDER,
+  NODE_WIDTH,
+} from "../src/canvas/constants.js";
 import { buildSuggestionPreview } from "../src/canvas/suggestionPreview.js";
 import type { SuggestionItem } from "../src/suggest/index.js";
 
@@ -71,8 +76,13 @@ describe("buildSuggestionPreview", () => {
     expect(preview).not.toBeNull();
     expect(preview!.edge).toBeNull();
     expect(preview!.rings).toEqual([
-      // org_id is row 0 of organizations at (100,50): top = 50 + 40 + 0.
-      { x: 100 - 3, y: 50 + HEADER_HEIGHT - 3, w: NODE_WIDTH + 6, h: FIELD_ROW_HEIGHT + 6 },
+      // org_id is row 0 of organizations at (100,50): top = 50 + border + header + 0.
+      {
+        x: 100 - 3,
+        y: 50 + NODE_BORDER + HEADER_HEIGHT - 3,
+        w: NODE_WIDTH + 6,
+        h: FIELD_ROW_HEIGHT + 6,
+      },
     ]);
     expect(preview!.caption.badge).toBe("Primary key");
   });
@@ -82,10 +92,10 @@ describe("buildSuggestionPreview", () => {
     expect(preview).not.toBeNull();
     expect(preview!.rings).toHaveLength(2);
     expect(preview!.edge).not.toBeNull();
-    // covered_entities.org_id is row 1 of the table at (500,300): top = 300 + 40 + 30.
+    // covered_entities.org_id is row 1 of the table at (500,300): top = 300 + border + header + 30.
     expect(preview!.rings[0]).toEqual({
       x: 500 - 3,
-      y: 300 + HEADER_HEIGHT + FIELD_ROW_HEIGHT - 3,
+      y: 300 + NODE_BORDER + HEADER_HEIGHT + FIELD_ROW_HEIGHT - 3,
       w: NODE_WIDTH + 6,
       h: FIELD_ROW_HEIGHT + 6,
     });
@@ -93,6 +103,52 @@ describe("buildSuggestionPreview", () => {
     expect(preview!.edge!.from.side).toBe("left");
     expect(preview!.edge!.to.side).toBe("right");
     expect(preview!.caption.badge).toBe("Foreign key");
+  });
+
+  it("locates a field whose canvas name is a remodeled (snake_case) form of the source column", () => {
+    // Canvas table holds `health_center_number`; the join candidate carries the raw `Health
+    // Center Number`. Tolerant matching (case + separators collapsed) should still find the row.
+    const remodeled: Schema = {
+      tables: [
+        {
+          id: "t1",
+          name: "organizations",
+          x: 0,
+          y: 0,
+          fields: [{ id: "f1", name: "health_center_number", type: "text", pk: false, fk: false }],
+        },
+        {
+          id: "t2",
+          name: "sites",
+          x: 400,
+          y: 0,
+          fields: [{ id: "f2", name: "health_center_number", type: "text", pk: false, fk: false }],
+        },
+      ],
+      relationships: [],
+    };
+    const renamedJoin = {
+      id: "fk2",
+      group: "fk",
+      needsReview: false,
+      join: {
+        candidate: {
+          left: { field: "Health Center Number", sourceName: "organizations.csv" },
+          right: { field: "Health Center Number", sourceName: "sites.csv" },
+        },
+        leftLabel: "organizations.csv · Health Center Number",
+        rightLabel: "sites.csv · Health Center Number",
+        overlapPercent: 100,
+        sharedValues: 3,
+        grainLabel: "N:M",
+        warning: null,
+      },
+    } as unknown as SuggestionItem;
+
+    const preview = buildSuggestionPreview(renamedJoin, remodeled);
+    expect(preview).not.toBeNull();
+    expect(preview!.rings).toHaveLength(2);
+    expect(preview!.edge).not.toBeNull();
   });
 
   it("returns null when the suggestion's table isn't on the canvas", () => {
