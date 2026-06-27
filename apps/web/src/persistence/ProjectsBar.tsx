@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import { useProjects } from "./useProjects.js";
+import { useProjectsContext } from "./ProjectsContext.js";
 import "./ProjectsBar.css";
 
 export function ProjectsBar() {
@@ -16,7 +16,7 @@ export function ProjectsBar() {
     renameProject,
     exportProject,
     importProject,
-  } = useProjects();
+  } = useProjectsContext();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [renaming, setRenaming] = useState(false);

@@ -18,6 +18,19 @@ export type ProjectRecord = ProjectMeta & {
 };
 
 /**
+ * Metadata plus the few derived display fields the Home/Projects grid needs (file chips, table
+ * count, relationship count). Derived from the full record at list time — cheap because listing
+ * already reads each record — so the grid never loads project bodies itself.
+ */
+export type ProjectSummary = ProjectMeta & {
+  /** Source file names, in source order, for the card's file chips. */
+  fileNames: string[];
+  tableCount: number;
+  /** Applied relationships (joins) in the schema — drives the card's status badge. */
+  relationshipCount: number;
+};
+
+/**
  * Minimal async key/value contract the project layer depends on. The browser uses an
  * IndexedDB-backed implementation; tests use an in-memory one. Keeping persistence behind
  * this interface lets the project logic be unit-tested without a browser.
