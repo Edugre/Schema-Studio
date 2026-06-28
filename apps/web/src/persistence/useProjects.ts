@@ -43,9 +43,14 @@ export type UseProjects = {
   newProject: () => void;
   /**
    * Create a project from explicit contents (e.g. the New Project modal: a name + parsed
-   * source files) and make it active. Falls back to the default name when none is given.
+   * source files) and make it active. Falls back to the default name when none is given. Resolves
+   * once the new project is active in the store, so callers can rely on the canvas being populated.
    */
-  createProject: (opts?: { name?: string; sources?: Source[]; chat?: ChatMessage[] }) => void;
+  createProject: (opts?: {
+    name?: string;
+    sources?: Source[];
+    chat?: ChatMessage[];
+  }) => Promise<void>;
   openProject: (id: string) => void;
   deleteProject: (id: string) => void;
   renameProject: (id: string, name: string) => void;
@@ -192,8 +197,8 @@ export function useProjects(
   }, [ready, writeActive, fail]);
 
   const createProject = useCallback(
-    (opts?: { name?: string; sources?: Source[]; chat?: ChatMessage[] }) => {
-      void (async () => {
+    async (opts?: { name?: string; sources?: Source[]; chat?: ChatMessage[] }) => {
+      try {
         await flushRef.current();
         const name = opts?.name?.trim() || DEFAULT_NAME;
         const record = newRecord(name, emptySchema(), opts?.sources ?? [], opts?.chat ?? []);
@@ -201,12 +206,14 @@ export function useProjects(
         await setActiveProjectId(kv, record.id);
         activate(record);
         await refreshList();
-      })().catch(fail);
+      } catch (reason) {
+        fail(reason);
+      }
     },
     [kv, activate, refreshList, fail],
   );
 
-  const newProject = useCallback(() => createProject(), [createProject]);
+  const newProject = useCallback(() => void createProject(), [createProject]);
 
   const openProject = useCallback(
     (id: string) => {

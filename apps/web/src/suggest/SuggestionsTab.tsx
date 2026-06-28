@@ -29,7 +29,28 @@ export function SuggestionsTab({
 }) {
   const { groups, openCount, needsReviewCount } = api;
   const schema = useSchemaStore((state) => state.schema);
+  const schemaDraft = useSchemaStore((state) => state.draft);
+  const acceptDraft = useSchemaStore((state) => state.acceptDraft);
+  const discardDraft = useSchemaStore((state) => state.discardDraft);
   const [message, setMessage] = useState<{ kind: "info" | "error"; text: string } | null>(null);
+
+  // The AI-drafted initial schema (ghost proposal) surfaced here as a reviewable card. Only the
+  // tables/relationships not already in the live schema are "proposed".
+  const draftTables = useMemo(() => {
+    if (!schemaDraft) {
+      return [];
+    }
+    const liveIds = new Set(schema.tables.map((table) => table.id));
+    return schemaDraft.tables.filter((table) => !liveIds.has(table.id));
+  }, [schemaDraft, schema]);
+  const draftRelCount = useMemo(() => {
+    if (!schemaDraft) {
+      return 0;
+    }
+    const liveIds = new Set(schema.relationships.map((relationship) => relationship.id));
+    return schemaDraft.relationships.filter((relationship) => !liveIds.has(relationship.id)).length;
+  }, [schemaDraft, schema]);
+  const hasDraft = draftTables.length > 0;
 
   // Optional AI rerank layer. `reverted` lets the user drop back to the deterministic order without
   // turning the feature off; ranking is "active" only when a result is in and not reverted.
@@ -108,9 +129,61 @@ export function SuggestionsTab({
   return (
     <>
       <div className="copilot-suggest-body">
-        <p className="copilot-suggest-help">
-          Select a suggestion to preview it on the canvas before applying.
-        </p>
+        {hasDraft ? (
+          <section className="copilot-suggest-draft">
+            <header className="copilot-suggest-draft__head">
+              <span className="copilot-suggest-draft__icon" aria-hidden>
+                <SparkleIcon size={14} />
+              </span>
+              <span className="copilot-suggest-draft__title">Initial schema draft</span>
+            </header>
+            <p className="copilot-suggest-draft__summary">
+              {draftTables.length} {draftTables.length === 1 ? "table" : "tables"}
+              {draftRelCount > 0
+                ? ` · ${draftRelCount} ${draftRelCount === 1 ? "relationship" : "relationships"}`
+                : ""}{" "}
+              proposed
+            </p>
+            <div className="copilot-suggest-draft__chips">
+              {draftTables.map((table) => (
+                <span key={table.id} className="copilot-suggest-draft__chip">
+                  {table.name}
+                </span>
+              ))}
+            </div>
+            <p className="copilot-suggest-draft__hint">
+              Shown as a ghost on the canvas. Accept to add it, or discard it.
+            </p>
+            <div className="copilot-suggest-draft__actions">
+              <button
+                type="button"
+                className="copilot-suggest-btn copilot-suggest-btn--ghost"
+                onClick={() => {
+                  discardDraft();
+                  onActivate(null);
+                }}
+              >
+                Discard
+              </button>
+              <button
+                type="button"
+                className="copilot-suggest-btn copilot-suggest-btn--primary"
+                onClick={() => {
+                  acceptDraft();
+                  onActivate(null);
+                }}
+              >
+                Accept draft
+              </button>
+            </div>
+          </section>
+        ) : null}
+
+        {openCount > 0 ? (
+          <p className="copilot-suggest-help">
+            Select a suggestion to preview it on the canvas before applying.
+          </p>
+        ) : null}
 
         {status === "ranking" ? (
           <p className="copilot-suggest-rank">
@@ -171,31 +244,33 @@ export function SuggestionsTab({
         ))}
       </div>
 
-      <div className="copilot-suggest-footer">
-        <span className="copilot-suggest-footer__status">
-          {needsReviewCount > 0 ? (
-            <span className="copilot-suggest-amber">{needsReviewCount} needs review</span>
-          ) : (
-            `${openCount} open`
-          )}
-        </span>
-        <div className="copilot-suggest-footer__actions">
-          <button
-            type="button"
-            className="copilot-suggest-btn copilot-suggest-btn--ghost"
-            onClick={dismissAll}
-          >
-            Dismiss all
-          </button>
-          <button
-            type="button"
-            className="copilot-suggest-btn copilot-suggest-btn--primary"
-            onClick={applyAll}
-          >
-            Apply all {openCount}
-          </button>
+      {openCount > 0 ? (
+        <div className="copilot-suggest-footer">
+          <span className="copilot-suggest-footer__status">
+            {needsReviewCount > 0 ? (
+              <span className="copilot-suggest-amber">{needsReviewCount} needs review</span>
+            ) : (
+              `${openCount} open`
+            )}
+          </span>
+          <div className="copilot-suggest-footer__actions">
+            <button
+              type="button"
+              className="copilot-suggest-btn copilot-suggest-btn--ghost"
+              onClick={dismissAll}
+            >
+              Dismiss all
+            </button>
+            <button
+              type="button"
+              className="copilot-suggest-btn copilot-suggest-btn--primary"
+              onClick={applyAll}
+            >
+              Apply all {openCount}
+            </button>
+          </div>
         </div>
-      </div>
+      ) : null}
     </>
   );
 }

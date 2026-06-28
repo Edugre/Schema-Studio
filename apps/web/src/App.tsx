@@ -5,6 +5,7 @@ import { CanvasPanel } from "./canvas/index.js";
 import { ApiKeyProvider } from "./copilot/ApiKeyContext.js";
 import { CopilotPanel, type CopilotTab } from "./copilot/index.js";
 import { HomePage } from "./home/index.js";
+import type { CopilotKickoff } from "./copilot/index.js";
 import { ProjectsProvider } from "./persistence/index.js";
 import { SettingsPage } from "./settings/SettingsPage.js";
 import { SourcesPanel } from "./sources";
@@ -32,12 +33,12 @@ export function App() {
   // Side-panel collapse: collapsed panels shrink to a thin rail so the canvas gets more room.
   const [sourcesCollapsed, setSourcesCollapsed] = useState(false);
   const [copilotCollapsed, setCopilotCollapsed] = useState(false);
-  // Seeds the Copilot input when entering the editor from the New Project modal's
-  // "Derive schema" (its description/goals). Reset on every other entry so it doesn't linger.
-  const [copilotDraft, setCopilotDraft] = useState<string | undefined>(undefined);
+  // Seeds the Copilot when entering the editor from the New Project modal's "Derive schema". Carries
+  // the framed prompt and whether to auto-draft a ghost schema. Reset on every other entry.
+  const [copilotKickoff, setCopilotKickoff] = useState<CopilotKickoff | undefined>(undefined);
 
-  const enterEditor = (draft?: string) => {
-    setCopilotDraft(draft);
+  const enterEditor = (kickoff?: CopilotKickoff) => {
+    setCopilotKickoff(kickoff);
     setView("dashboard");
   };
 
@@ -95,7 +96,7 @@ export function App() {
                 />
                 <CopilotPanel
                   onConnect={() => openByok("dashboard")}
-                  initialDraft={copilotDraft}
+                  kickoff={copilotKickoff}
                   tab={copilotTab}
                   onTabChange={changeCopilotTab}
                   activeSuggestionId={activeSuggestionId}

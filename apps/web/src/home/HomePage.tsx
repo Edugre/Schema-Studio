@@ -12,6 +12,11 @@ import {
   TrashIcon,
   UserIcon,
 } from "../ui/icons.js";
+import {
+  buildInitialSchemaPrompt,
+  useAutoDraftPreference,
+  type CopilotKickoff,
+} from "../copilot/index.js";
 import { ConfirmDialog } from "../ui/ConfirmDialog.js";
 import { NewProjectModal, type DeriveInput } from "./NewProjectModal.js";
 import { formatRelativeTime } from "./relativeTime.js";
@@ -39,11 +44,12 @@ export function HomePage({
   onEnterEditor,
 }: {
   onOpenSettings: () => void;
-  /** Enter the editor; `draft` seeds the Copilot input (used by the New Project modal). */
-  onEnterEditor: (draft?: string) => void;
+  /** Enter the editor; `kickoff` seeds the Copilot (used by the New Project modal). */
+  onEnterEditor: (kickoff?: CopilotKickoff) => void;
 }) {
   const { summaries, ready, createProject, openProject, renameProject, deleteProject } =
     useProjectsContext();
+  const { enabled: autoDraft } = useAutoDraftPreference();
   const [query, setQuery] = useState("");
   const [filterMode, setFilterMode] = useState<FilterMode>("recent");
   const [modalOpen, setModalOpen] = useState(false);
@@ -72,9 +78,19 @@ export function HomePage({
   };
 
   const derive = (input: DeriveInput) => {
-    createProject({ name: input.name, sources: input.sources });
     setModalOpen(false);
-    onEnterEditor(input.description || undefined);
+    // When auto-draft is on, send a framed prompt and let the Copilot draft a ghost schema.
+    // Otherwise preserve today's behavior: seed the raw description into the input to send manually.
+    const kickoff: CopilotKickoff | undefined = autoDraft
+      ? { message: buildInitialSchemaPrompt(input), autoDraft: true }
+      : input.description
+        ? { message: input.description, autoDraft: false }
+        : undefined;
+    // Await the new project so its sources are in the store before the editor (and any auto-draft)
+    // reads them, then enter.
+    void createProject({ name: input.name, sources: input.sources }).then(() =>
+      onEnterEditor(kickoff),
+    );
   };
 
   const startRename = (id: string) => {
