@@ -32,6 +32,14 @@ export function App() {
   // Side-panel collapse: collapsed panels shrink to a thin rail so the canvas gets more room.
   const [sourcesCollapsed, setSourcesCollapsed] = useState(false);
   const [copilotCollapsed, setCopilotCollapsed] = useState(false);
+  // Seeds the Copilot input when entering the editor from the New Project modal's
+  // "Derive schema" (its description/goals). Reset on every other entry so it doesn't linger.
+  const [copilotDraft, setCopilotDraft] = useState<string | undefined>(undefined);
+
+  const enterEditor = (draft?: string) => {
+    setCopilotDraft(draft);
+    setView("dashboard");
+  };
 
   const openByok = (from: View) => {
     setByokReturn(from);
@@ -62,10 +70,7 @@ export function App() {
               onAddKey={() => openByok("settings")}
             />
           ) : view === "home" ? (
-            <HomePage
-              onOpenSettings={() => openSettings("home")}
-              onEnterEditor={() => setView("dashboard")}
-            />
+            <HomePage onOpenSettings={() => openSettings("home")} onEnterEditor={enterEditor} />
           ) : (
             <div className="app-root">
               <TopBar
@@ -90,6 +95,7 @@ export function App() {
                 />
                 <CopilotPanel
                   onConnect={() => openByok("dashboard")}
+                  initialDraft={copilotDraft}
                   tab={copilotTab}
                   onTabChange={changeCopilotTab}
                   activeSuggestionId={activeSuggestionId}

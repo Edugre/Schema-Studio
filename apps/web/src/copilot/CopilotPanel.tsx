@@ -42,6 +42,7 @@ export type CopilotTab = "chat" | "suggestions";
 
 export function CopilotPanel({
   onConnect,
+  initialDraft,
   tab,
   onTabChange,
   activeSuggestionId,
@@ -50,6 +51,8 @@ export function CopilotPanel({
   onToggleCollapse,
 }: {
   onConnect: () => void;
+  /** Pre-fills the chat input on mount (e.g. the New Project modal's description/goals). */
+  initialDraft?: string | undefined;
   tab: CopilotTab;
   onTabChange: (tab: CopilotTab) => void;
   activeSuggestionId: string | null;
@@ -59,7 +62,7 @@ export function CopilotPanel({
 }) {
   const provider = useAiProvider();
   const suggestions = useSuggestions();
-  const [draft, setDraft] = useState("");
+  const [draft, setDraft] = useState(initialDraft ?? "");
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<{ attempt: number; max: number } | null>(null);
   const cancelledRef = useRef(false);
