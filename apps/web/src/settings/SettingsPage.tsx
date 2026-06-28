@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 
 import { useApiKeyContext } from "../copilot/ApiKeyContext.js";
+import { useRerankPreference } from "../suggest/rerankPreference.js";
 import { useThemeContext, type Theme } from "../theme/ThemeContext.js";
 import {
   ChevronLeftIcon,
@@ -98,6 +99,7 @@ export function SettingsPage({ onBack, onAddKey }: { onBack: () => void; onAddKe
 
 function ApiKeysSection({ onAddKey }: { onAddKey: () => void }) {
   const { apiKey, remember, setApiKey, setRemember } = useApiKeyContext();
+  const { enabled: rerank, setEnabled: setRerank } = useRerankPreference();
 
   const hasKey = apiKey.trim().length > 0;
 
@@ -186,6 +188,19 @@ function ApiKeysSection({ onAddKey }: { onAddKey: () => void }) {
           onChange={(event) => setRemember(event.target.checked)}
         />
         Remember this key on this device (otherwise it is kept in memory for this session only)
+      </label>
+
+      <h2 className="settings__section-heading">AI-ranked suggestions</h2>
+      <label className="settings__remember">
+        <input
+          type="checkbox"
+          checked={rerank}
+          disabled={!hasKey}
+          onChange={(event) => setRerank(event.target.checked)}
+        />
+        Use AI to reorder and explain content-aware suggestions (makes a billable call to your
+        provider when the suggestion set changes). Detectors still produce the suggestions — this
+        only ranks them.
       </label>
     </div>
   );

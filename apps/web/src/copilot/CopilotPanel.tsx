@@ -1,7 +1,6 @@
-import type { AiProvider } from "@schema-studio/core";
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
-import { AnthropicBrowserProvider } from "../ai/AnthropicBrowserProvider.js";
+import { useAiProvider } from "../ai/useAiProvider.js";
 import { useSchemaStore } from "../store/index.js";
 import { SuggestionsTab, useSuggestions } from "../suggest/index.js";
 import {
@@ -13,7 +12,6 @@ import {
   SendIcon,
   SparkleIcon,
 } from "../ui/icons.js";
-import { useApiKeyContext } from "./ApiKeyContext.js";
 import "./CopilotPanel.css";
 import { Markdown } from "./Markdown.js";
 import {
@@ -59,7 +57,7 @@ export function CopilotPanel({
   collapsed: boolean;
   onToggleCollapse: () => void;
 }) {
-  const { apiKey } = useApiKeyContext();
+  const provider = useAiProvider();
   const suggestions = useSuggestions();
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -71,14 +69,6 @@ export function CopilotPanel({
   const selectTable = useSchemaStore((state) => state.selectTable);
   const messages = useSchemaStore((state) => state.chat);
   const appendChatMessages = useSchemaStore((state) => state.appendChatMessages);
-
-  const provider = useMemo((): AiProvider | null => {
-    const trimmed = apiKey.trim();
-    if (!trimmed) {
-      return null;
-    }
-    return new AnthropicBrowserProvider(trimmed);
-  }, [apiKey]);
 
   const scrollToBottom = () => {
     requestAnimationFrame(() => {
