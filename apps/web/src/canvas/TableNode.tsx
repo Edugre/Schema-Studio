@@ -1,21 +1,63 @@
 import type { Field, Table } from "@schema-studio/core";
-import { Handle, Position } from "@xyflow/react";
+import { Handle, NodeResizeControl, Position } from "@xyflow/react";
 import type { Node, NodeProps } from "@xyflow/react";
 import { useState } from "react";
 
 import { useSchemaStore } from "../store/index.js";
-import { NODE_WIDTH } from "./constants.js";
+import { MIN_NODE_WIDTH, NODE_WIDTH } from "./constants.js";
 
 export type TableNodeData = { table: Table; proposed?: boolean };
 export type TableFlowNode = Node<TableNodeData, "table">;
 
+/** Suggested data types offered in the field-type editor's datalist (free-form is still allowed). */
+const COMMON_FIELD_TYPES = [
+  "text",
+  "int",
+  "bigint",
+  "float",
+  "numeric",
+  "boolean",
+  "date",
+  "timestamp",
+  "uuid",
+  "json",
+];
+
 function FieldRow({ table, field }: { table: Table; field: Field }) {
   const togglePk = useSchemaStore((state) => state.togglePk);
   const removeField = useSchemaStore((state) => state.removeField);
+  const renameField = useSchemaStore((state) => state.renameField);
+  const setFieldType = useSchemaStore((state) => state.setFieldType);
   const selectField = useSchemaStore((state) => state.selectField);
   const selectedFieldId = useSchemaStore((state) => state.selection.fieldId);
 
   const selected = selectedFieldId === field.id;
+
+  // At most one inline editor open at a time: the name or the type.
+  const [editing, setEditing] = useState<"name" | "type" | null>(null);
+  const [draft, setDraft] = useState("");
+
+  const startEdit = (which: "name" | "type") => {
+    setDraft(which === "name" ? field.name : field.type);
+    setEditing(which);
+  };
+
+  const commit = () => {
+    if (editing === "name") {
+      renameField(table.id, field.id, draft);
+    } else if (editing === "type") {
+      setFieldType(table.id, field.id, draft);
+    }
+    setEditing(null);
+  };
+
+  const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      commit();
+    } else if (event.key === "Escape") {
+      setEditing(null);
+    }
+  };
 
   return (
     <div
@@ -39,9 +81,59 @@ function FieldRow({ table, field }: { table: Table; field: Field }) {
         }}
       />
 
-      <span className="table-node__field-name">{field.name}</span>
+      {editing === "name" ? (
+        <input
+          className="table-node__field-input nodrag"
+          value={draft}
+          autoFocus
+          onClick={(event) => event.stopPropagation()}
+          onChange={(event) => setDraft(event.target.value)}
+          onBlur={commit}
+          onKeyDown={onKeyDown}
+        />
+      ) : (
+        <span
+          className="table-node__field-name"
+          title="Double-click to rename"
+          onDoubleClick={(event) => {
+            event.stopPropagation();
+            startEdit("name");
+          }}
+        >
+          {field.name}
+        </span>
+      )}
       {field.fk ? <span className="table-node__fk">FK</span> : null}
-      <span className="table-node__type">{field.type}</span>
+      {editing === "type" ? (
+        <>
+          <input
+            className="table-node__type-input nodrag"
+            list="table-node-field-types"
+            value={draft}
+            autoFocus
+            onClick={(event) => event.stopPropagation()}
+            onChange={(event) => setDraft(event.target.value)}
+            onBlur={commit}
+            onKeyDown={onKeyDown}
+          />
+          <datalist id="table-node-field-types">
+            {COMMON_FIELD_TYPES.map((type) => (
+              <option key={type} value={type} />
+            ))}
+          </datalist>
+        </>
+      ) : (
+        <span
+          className="table-node__type"
+          title="Double-click to edit type"
+          onDoubleClick={(event) => {
+            event.stopPropagation();
+            startEdit("type");
+          }}
+        >
+          {field.type}
+        </span>
+      )}
       <button
         type="button"
         className="table-node__remove"
@@ -196,13 +288,37 @@ function ProposedTableNode({ table }: { table: Table }) {
 
 export function TableNode({ data, selected }: NodeProps<TableFlowNode>) {
   const { table, proposed } = data;
+  const resizeTable = useSchemaStore((state) => state.resizeTable);
 
   if (proposed) {
     return <ProposedTableNode table={table} />;
   }
 
+  const width = table.width ?? NODE_WIDTH;
+
+  // Horizontal-only resize: a side handle on each edge. Width persists on the table; height
+  // stays content-driven, so we only ever read/write `params.width`.
+  const onResize = (_: unknown, params: { width: number }) =>
+    resizeTable(table.id, Math.round(params.width));
+
   return (
-    <div className={`table-node${selected ? " is-selected" : ""}`} style={{ width: NODE_WIDTH }}>
+    <div className={`table-node${selected ? " is-selected" : ""}`} style={{ width }} data-resizable>
+      {selected ? (
+        <>
+          <NodeResizeControl
+            className="table-node__resize table-node__resize--left"
+            position="left"
+            minWidth={MIN_NODE_WIDTH}
+            onResize={onResize}
+          />
+          <NodeResizeControl
+            className="table-node__resize table-node__resize--right"
+            position="right"
+            minWidth={MIN_NODE_WIDTH}
+            onResize={onResize}
+          />
+        </>
+      ) : null}
       <TableTitle table={table} />
       {table.fields.map((field) => (
         <FieldRow key={field.id} table={table} field={field} />

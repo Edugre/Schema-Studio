@@ -113,6 +113,53 @@ describe("schemaStore", () => {
       expect(result.rejected).toEqual([]);
       expect(store.getState().schema.tables[0]?.fields[0]?.pk).toBe(true);
     });
+
+    it("renames a field as an undoable step", () => {
+      const store = createSchemaStore({ makeId: makeTestIds() });
+      store.getState().addTable("users");
+      const tableId = store.getState().schema.tables[0]?.id;
+      store.getState().addField(tableId!, "id");
+      const fieldId = store.getState().schema.tables[0]?.fields[0]?.id;
+
+      const result = store.getState().renameField(tableId!, fieldId!, "user_id");
+
+      expect(result.rejected).toEqual([]);
+      expect(store.getState().schema.tables[0]?.fields[0]?.name).toBe("user_id");
+
+      store.getState().undo();
+      expect(store.getState().schema.tables[0]?.fields[0]?.name).toBe("id");
+    });
+
+    it("rejects renaming a field to a duplicate name in the same table", () => {
+      const store = createSchemaStore({ makeId: makeTestIds() });
+      store.getState().addTable("users");
+      const tableId = store.getState().schema.tables[0]?.id;
+      store.getState().addField(tableId!, "id");
+      store.getState().addField(tableId!, "email");
+      const idField = store.getState().schema.tables[0]?.fields[0]?.id;
+
+      const result = store.getState().renameField(tableId!, idField!, "Email");
+
+      expect(result.applied).toEqual([]);
+      expect(result.rejected).toHaveLength(1);
+      expect(store.getState().schema.tables[0]?.fields[0]?.name).toBe("id");
+    });
+
+    it("sets a field type as an undoable step", () => {
+      const store = createSchemaStore({ makeId: makeTestIds() });
+      store.getState().addTable("users");
+      const tableId = store.getState().schema.tables[0]?.id;
+      store.getState().addField(tableId!, "id", { type: "text" });
+      const fieldId = store.getState().schema.tables[0]?.fields[0]?.id;
+
+      const result = store.getState().setFieldType(tableId!, fieldId!, "bigint");
+
+      expect(result.rejected).toEqual([]);
+      expect(store.getState().schema.tables[0]?.fields[0]?.type).toBe("bigint");
+
+      store.getState().undo();
+      expect(store.getState().schema.tables[0]?.fields[0]?.type).toBe("text");
+    });
   });
 
   describe("sources", () => {
@@ -212,6 +259,23 @@ describe("schemaStore", () => {
       store.getState().undo();
       expect(store.getState().schema.tables[0]?.name).toBe("users");
       expect(store.getState().schema.tables[0]).toMatchObject({ x: 0, y: 0 });
+    });
+
+    it("coalesces consecutive table resizes into one undo step", () => {
+      const store = createSchemaStore({ makeId: makeTestIds() });
+
+      store.getState().addTable("users", { x: 0, y: 0 });
+      const tableId = store.getState().schema.tables[0]?.id;
+      expect(store.getState().schema.tables[0]?.width).toBeUndefined();
+
+      store.getState().resizeTable(tableId!, 240);
+      store.getState().resizeTable(tableId!, 280);
+      store.getState().resizeTable(tableId!, 320);
+
+      expect(store.getState().schema.tables[0]?.width).toBe(320);
+
+      store.getState().undo();
+      expect(store.getState().schema.tables[0]?.width).toBeUndefined();
     });
 
     it("applies a batched moveTables as a single undo step", () => {

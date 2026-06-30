@@ -8,7 +8,6 @@ import { IndexedDbKeyValueStore } from "./kv.js";
 import {
   deleteProjectRecord,
   getActiveProjectId,
-  listProjects,
   listProjectSummaries,
   loadProjectRecord,
   saveProjectRecord,
@@ -132,16 +131,14 @@ export function useProjects(
 
     void (async () => {
       const activeIdFromDb = await getActiveProjectId(kv);
-      let record = activeIdFromDb ? await loadProjectRecord(kv, activeIdFromDb) : undefined;
+      const record = activeIdFromDb ? await loadProjectRecord(kv, activeIdFromDb) : undefined;
 
-      if (!record) {
-        const state = useSchemaStore.getState();
-        record = newRecord(DEFAULT_NAME, state.schema, state.sources, state.chat);
-        await saveProjectRecord(kv, record);
-        await setActiveProjectId(kv, record.id);
+      // No auto-created default project: when there's nothing to restore, the Home screen shows
+      // just the "derive" card. The editor is only reached by opening or creating a project, both
+      // of which set an active project, so the store never needs a placeholder here.
+      if (record) {
+        activate(record);
       }
-
-      activate(record);
       await refreshList();
       setReady(true);
     })().catch(fail);
@@ -240,15 +237,12 @@ export function useProjects(
       void (async () => {
         await deleteProjectRecord(kv, id);
 
+        // Deleting the active project (always from Home) clears the active slot rather than
+        // minting a replacement — the Home grid simply drops the card.
         if (id === activeIdRef.current) {
-          const remaining = await listProjects(kv);
-          const next = remaining[0] ? await loadProjectRecord(kv, remaining[0].id) : undefined;
-          const record = next ?? newRecord(DEFAULT_NAME, emptySchema(), [], []);
-          if (!next) {
-            await saveProjectRecord(kv, record);
-          }
-          await setActiveProjectId(kv, record.id);
-          activate(record);
+          await setActiveProjectId(kv, undefined);
+          useSchemaStore.getState().loadProject(emptySchema(), []);
+          setActiveIdState(undefined);
         }
 
         await refreshList();

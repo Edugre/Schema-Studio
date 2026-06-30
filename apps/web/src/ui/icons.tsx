@@ -367,3 +367,53 @@ export function RedoIcon(props: IconProps) {
     </svg>
   );
 }
+
+export function MinusIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M5 12h14" />
+    </svg>
+  );
+}
+
+export function FitViewIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M4 9V6a2 2 0 0 1 2-2h3" />
+      <path d="M20 9V6a2 2 0 0 0-2-2h-3" />
+      <path d="M4 15v3a2 2 0 0 0 2 2h3" />
+      <path d="M20 15v3a2 2 0 0 1-2 2h-3" />
+    </svg>
+  );
+}
+
+export function MaximizeIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M8 3H5a2 2 0 0 0-2 2v3" />
+      <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
+      <path d="M3 16v3a2 2 0 0 0 2 2h3" />
+      <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
+    </svg>
+  );
+}
+
+export function MinimizeIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M8 3v3a2 2 0 0 1-2 2H3" />
+      <path d="M21 8h-3a2 2 0 0 1-2-2V3" />
+      <path d="M3 16h3a2 2 0 0 1 2 2v3" />
+      <path d="M16 21v-3a2 2 0 0 1 2-2h3" />
+    </svg>
+  );
+}
+
+export function UnlockIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <rect x="4" y="10" width="16" height="11" rx="2" />
+      <path d="M8 10V7a4 4 0 0 1 7.5-2" />
+    </svg>
+  );
+}

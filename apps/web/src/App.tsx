@@ -31,8 +31,9 @@ export function App() {
   // preview the active suggestion. Cleared when leaving the Suggestions tab.
   const [activeSuggestionId, setActiveSuggestionId] = useState<string | null>(null);
   // Side-panel collapse: collapsed panels shrink to a thin rail so the canvas gets more room.
-  const [sourcesCollapsed, setSourcesCollapsed] = useState(false);
-  const [copilotCollapsed, setCopilotCollapsed] = useState(false);
+  // Both start collapsed so the editor opens canvas-first; the user expands what they need.
+  const [sourcesCollapsed, setSourcesCollapsed] = useState(true);
+  const [copilotCollapsed, setCopilotCollapsed] = useState(true);
   // Seeds the Copilot when entering the editor from the New Project modal's "Derive schema". Carries
   // the framed prompt and whether to auto-draft a ghost schema. Reset on every other entry.
   const [copilotKickoff, setCopilotKickoff] = useState<CopilotKickoff | undefined>(undefined);

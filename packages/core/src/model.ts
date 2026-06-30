@@ -17,6 +17,8 @@ export const TableSchema = z.object({
   name: z.string(),
   x: z.number(),
   y: z.number(),
+  /** Optional rendered width (px). Presentation geometry alongside x/y; defaults to the node width. */
+  width: z.number().optional(),
   fields: z.array(FieldSchema),
 });
 export type Table = z.infer<typeof TableSchema>;

@@ -50,6 +50,8 @@ export type SchemaStore = {
   removeField: (tableId: string, fieldId: string) => RunActionsResult;
   removeTable: (tableId: string) => RunActionsResult;
   renameTable: (tableId: string, name: string) => RunActionsResult;
+  renameField: (tableId: string, fieldId: string, name: string) => RunActionsResult;
+  setFieldType: (tableId: string, fieldId: string, type: string) => RunActionsResult;
   togglePk: (tableId: string, fieldId: string) => RunActionsResult;
   addRelationship: (
     fromTableId: string,
@@ -63,6 +65,7 @@ export type SchemaStore = {
 
   moveTable: (tableId: string, x: number, y: number) => void;
   moveTables: (positions: Array<{ tableId: string; x: number; y: number }>) => void;
+  resizeTable: (tableId: string, width: number) => void;
 
   addSource: (source: Source) => void;
   removeSource: (sourceId: string) => void;
@@ -271,6 +274,76 @@ export function createSchemaStore(options?: CreateSchemaStoreOptions) {
           return { applied: [{ op: "toggle_pk", tableIds: [tableId] }], rejected: [] };
         },
 
+        renameField: (tableId, fieldId, name) => {
+          const table = findTableById(get().schema, tableId);
+          if (!table) {
+            return rejectUnknownTable(tableId, "rename_field");
+          }
+
+          const field = findFieldById(table, fieldId);
+          if (!field) {
+            return rejectUnknownField(tableId, fieldId, "rename_field");
+          }
+
+          const next = name.trim();
+          if (!next || next === field.name) {
+            return { applied: [], rejected: [] };
+          }
+          if (
+            table.fields.some(
+              (candidate) =>
+                candidate.id !== fieldId && candidate.name.toLowerCase() === next.toLowerCase(),
+            )
+          ) {
+            return {
+              applied: [],
+              rejected: [
+                {
+                  action: { op: "rename_field", tableId, fieldId, name: next },
+                  reason: `field '${next}' already exists in '${table.name}'`,
+                },
+              ],
+            };
+          }
+
+          commitSnapshot((draft) => {
+            const draftTable = findTableById(draft.schema, tableId);
+            const draftField = draftTable && findFieldById(draftTable, fieldId);
+            if (draftField) {
+              draftField.name = next;
+            }
+          });
+
+          return { applied: [{ op: "rename_field", tableIds: [tableId] }], rejected: [] };
+        },
+
+        setFieldType: (tableId, fieldId, type) => {
+          const table = findTableById(get().schema, tableId);
+          if (!table) {
+            return rejectUnknownTable(tableId, "set_field_type");
+          }
+
+          const field = findFieldById(table, fieldId);
+          if (!field) {
+            return rejectUnknownField(tableId, fieldId, "set_field_type");
+          }
+
+          const next = type.trim();
+          if (!next || next === field.type) {
+            return { applied: [], rejected: [] };
+          }
+
+          commitSnapshot((draft) => {
+            const draftTable = findTableById(draft.schema, tableId);
+            const draftField = draftTable && findFieldById(draftTable, fieldId);
+            if (draftField) {
+              draftField.type = next;
+            }
+          });
+
+          return { applied: [{ op: "set_field_type", tableIds: [tableId] }], rejected: [] };
+        },
+
         addRelationship: (fromTableId, fromFieldId, toTableId, toFieldId, cardinality) => {
           const { schema } = get();
           const fromTable = findTableById(schema, fromTableId);
@@ -404,6 +477,21 @@ export function createSchemaStore(options?: CreateSchemaStoreOptions) {
                 table.y = y;
               }
             }
+          });
+        },
+
+        resizeTable: (tableId, width) => {
+          const before = captureSnapshot(get());
+
+          set((draft) => {
+            const table = findTableById(draft.schema, tableId);
+            if (!table) {
+              return;
+            }
+
+            // Coalesce a continuous drag-resize into a single undo step.
+            pushHistory(draft._history, before, `resize:${tableId}`);
+            table.width = width;
           });
         },
 
