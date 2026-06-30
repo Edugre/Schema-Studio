@@ -59,6 +59,22 @@ export type SuggestionRanking = {
   priority?: "high" | "normal" | "low";
 };
 
+/**
+ * One model the user's key can access, as projected from the provider's model catalog. A lossy
+ * view of the Anthropic Models API object: `id` is the request string, `displayName` is for the
+ * picker, and the optional token fields describe the context window / output cap when the provider
+ * reports them. Providers (and tests) need not implement listing — see {@link AiProvider.listModels}.
+ */
+export type ModelInfo = {
+  id: string;
+  displayName: string;
+  createdAt?: string;
+  /** Context-window size in tokens, when the provider reports it. */
+  maxInputTokens?: number;
+  /** Maximum output tokens per request, when the provider reports it. */
+  maxOutputTokens?: number;
+};
+
 export interface AiProvider {
   /**
    * Propose a reply + actions for `message`. `history` carries earlier turns so the model can
@@ -83,4 +99,11 @@ export interface AiProvider {
     sources: ParsedSource[],
     candidates: SuggestionDigest[],
   ): Promise<SuggestionRanking[]>;
+
+  /**
+   * Optional: list the models the current credentials can use, for a model picker. Optional so
+   * providers (and tests) need not implement it — consumers feature-detect and fall back to a
+   * curated static catalog when it's absent or the call fails.
+   */
+  listModels?(): Promise<ModelInfo[]>;
 }
