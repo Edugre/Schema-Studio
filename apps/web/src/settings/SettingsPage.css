@@ -415,6 +415,57 @@
   color: var(--text-muted);
 }
 
+.settings__field-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.settings__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings__field-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.settings__field--model {
+  flex: 1 1 220px;
+}
+
+.settings__select {
+  width: 100%;
+  min-width: 160px;
+  height: 38px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.settings__field--model .settings__select {
+  max-width: 260px;
+}
+
+.settings__select:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.settings__select:disabled {
+  cursor: default;
+  color: var(--text-muted);
+  background: var(--surface-strong);
+}
+
 .settings__segments {
   display: flex;
   gap: 8px;

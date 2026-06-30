@@ -294,16 +294,69 @@
   font-weight: 600;
 }
 
-.copilot-chip--applied {
+/* ---- Applied changes card (collapsible, groups one turn's applied actions) ---- */
+.copilot-applied {
   margin-top: 10px;
   border: 1px solid var(--border-subtle);
+  border-radius: 6px;
   background: var(--surface);
-  color: var(--text);
+  overflow: hidden;
 }
 
-.copilot-chip--applied svg {
+.copilot-applied__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.copilot-applied__head:hover {
+  background: var(--surface-hover);
+}
+
+.copilot-applied__head > svg:first-child {
   flex-shrink: 0;
   color: var(--success);
+}
+
+.copilot-applied__title {
+  flex: 1;
+  min-width: 0;
+}
+
+.copilot-applied__title strong {
+  font-weight: 600;
+}
+
+.copilot-applied__chevron {
+  flex-shrink: 0;
+  color: var(--text-faint);
+  transition: transform 0.16s ease;
+}
+
+.copilot-applied.is-open .copilot-applied__chevron {
+  transform: rotate(180deg);
+}
+
+.copilot-applied__list {
+  margin: 0;
+  padding: 2px 10px 8px 30px;
+  list-style: disc;
+}
+
+.copilot-applied__item {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-muted);
 }
 
 .copilot-chip--rejected {

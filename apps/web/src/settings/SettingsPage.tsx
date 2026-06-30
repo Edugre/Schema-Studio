@@ -1,5 +1,7 @@
 import { useState, type ReactNode } from "react";
 
+import { useModelPreference } from "../ai/modelPreference.js";
+import { useModels } from "../ai/useModels.js";
 import { useApiKeyContext } from "../copilot/ApiKeyContext.js";
 import { useAutoDraftPreference } from "../copilot/autoDraftPreference.js";
 import { useRerankPreference } from "../suggest/rerankPreference.js";
@@ -98,12 +100,31 @@ export function SettingsPage({ onBack, onAddKey }: { onBack: () => void; onAddKe
   );
 }
 
+function formatContext(maxInputTokens?: number): string {
+  if (!maxInputTokens) {
+    return "—";
+  }
+  return maxInputTokens >= 1_000_000
+    ? `${Math.round(maxInputTokens / 1_000_000)}M tokens`
+    : `${Math.round(maxInputTokens / 1_000)}K tokens`;
+}
+
 function ApiKeysSection({ onAddKey }: { onAddKey: () => void }) {
   const { apiKey, remember, setApiKey, setRemember } = useApiKeyContext();
   const { enabled: rerank, setEnabled: setRerank } = useRerankPreference();
   const { enabled: autoDraft, setEnabled: setAutoDraft } = useAutoDraftPreference();
+  const { model, setModel } = useModelPreference();
+  const { models, loading: modelsLoading } = useModels();
 
   const hasKey = apiKey.trim().length > 0;
+
+  // Make sure the saved model is always selectable, even if the live list (or the static catalog)
+  // doesn't include it — a custom or no-longer-listed id still shows as the current choice.
+  const modelOptions = models.some((candidate) => candidate.id === model)
+    ? models
+    : [{ id: model, displayName: model }, ...models];
+
+  const selectedModel = modelOptions.find((candidate) => candidate.id === model);
 
   const handleRemove = () => {
     setRemember(false);
@@ -191,6 +212,40 @@ function ApiKeysSection({ onAddKey }: { onAddKey: () => void }) {
         />
         Remember this key on this device (otherwise it is kept in memory for this session only)
       </label>
+
+      <h2 className="settings__section-heading">Model</h2>
+      <p className="settings__field-label">
+        The Claude model used for Copilot, suggestion ranking, and the initial-schema draft.
+        {modelsLoading ? " Loading your available models…" : ""}
+      </p>
+      <div className="settings__field-row">
+        <label className="settings__field settings__field--model">
+          <span className="settings__field-name">Model</span>
+          <select
+            className="settings__select"
+            value={model}
+            onChange={(event) => setModel(event.target.value)}
+          >
+            {modelOptions.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.displayName}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="settings__field">
+          <span className="settings__field-name">Context</span>
+          {/* Display-only — the window is fixed by the model, not a separate request parameter. */}
+          <select className="settings__select" disabled aria-label="Model context window">
+            <option>{formatContext(selectedModel?.maxInputTokens)}</option>
+          </select>
+        </label>
+      </div>
+      <p className="settings__hint">
+        {hasKey
+          ? "Pulled live from your key’s available models, with current models as a fallback."
+          : "Add a key to load the exact models it can access. The current models are shown until then."}
+      </p>
 
       <h2 className="settings__section-heading">AI-ranked suggestions</h2>
       <label className="settings__remember">

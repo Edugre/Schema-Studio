@@ -5,6 +5,7 @@ export type {
   AiProviderResult,
   ConversationTurn,
   CopilotStatus,
+  ModelInfo,
   SuggestionDigest,
   SuggestionRanking,
 } from "./ai/provider.js";

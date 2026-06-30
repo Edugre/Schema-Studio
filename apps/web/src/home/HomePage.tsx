@@ -199,7 +199,7 @@ export function HomePage({
             />
           ))}
 
-          {ready && visible.length === 0 ? (
+          {ready && visible.length === 0 && query.trim() ? (
             <p className="home-empty">No projects match “{query}”.</p>
           ) : null}
 

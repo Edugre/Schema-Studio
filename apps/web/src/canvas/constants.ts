@@ -4,6 +4,8 @@
  * actually paints, so nodes don't overlap after "Auto-arrange".
  */
 export const NODE_WIDTH = 220;
+/** Lower bound for manual table resizing (see {@link TableNode}'s NodeResizer). */
+export const MIN_NODE_WIDTH = 160;
 /** The 1px border drawn around `.table-node`; React Flow positions the node at its border box. */
 export const NODE_BORDER = 1;
 /** Matches `.table-node__title { height: 44px }` in App.css. */

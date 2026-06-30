@@ -61,6 +61,10 @@ export async function getActiveProjectId(kv: KeyValueStore): Promise<string | un
   return kv.get<string>(ACTIVE_KEY);
 }
 
-export async function setActiveProjectId(kv: KeyValueStore, id: string): Promise<void> {
+export async function setActiveProjectId(kv: KeyValueStore, id: string | undefined): Promise<void> {
+  if (id === undefined) {
+    await kv.remove(ACTIVE_KEY);
+    return;
+  }
   await kv.set(ACTIVE_KEY, id);
 }

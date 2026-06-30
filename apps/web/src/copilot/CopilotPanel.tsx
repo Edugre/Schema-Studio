@@ -8,6 +8,7 @@ import { useSchemaStore } from "../store/index.js";
 import { SuggestionsTab, useSuggestions } from "../suggest/index.js";
 import {
   CheckIcon,
+  ChevronDownIcon,
   DownloadIcon,
   InfoIcon,
   LockIcon,
@@ -39,6 +40,41 @@ function outcomeFooter(outcome: LoopOutcome, attempts: number): string | null {
     case "blocked":
       return null;
   }
+}
+
+/**
+ * Collapses the changes one Copilot turn applied into a single "Applied · N" card. Collapsed by
+ * default so a turn that touches many fields reads as one line; expand to see each change.
+ */
+function AppliedCard({ lines }: { lines: string[] }) {
+  const [open, setOpen] = useState(false);
+  const count = lines.length;
+
+  return (
+    <div className={`copilot-applied${open ? " is-open" : ""}`}>
+      <button
+        type="button"
+        className="copilot-applied__head"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+      >
+        <CheckIcon size={15} />
+        <span className="copilot-applied__title">
+          <strong>Applied</strong> · {count} {count === 1 ? "change" : "changes"}
+        </span>
+        <ChevronDownIcon size={15} className="copilot-applied__chevron" />
+      </button>
+      {open ? (
+        <ul className="copilot-applied__list">
+          {lines.map((line) => (
+            <li key={line} className="copilot-applied__item">
+              {line}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
 }
 
 export type CopilotTab = "chat" | "suggestions";
@@ -417,16 +453,9 @@ export function CopilotPanel({
                           </span>
                           <div className="copilot-body">
                             <Markdown>{message.text}</Markdown>
-                            {message.applied
-                              ? message.applied.map((line) => (
-                                  <div key={line} className="copilot-chip copilot-chip--applied">
-                                    <CheckIcon size={15} />
-                                    <span>
-                                      <strong>Applied</strong> · {line}
-                                    </span>
-                                  </div>
-                                ))
-                              : null}
+                            {message.applied && message.applied.length > 0 ? (
+                              <AppliedCard lines={message.applied} />
+                            ) : null}
                             {message.rejected
                               ? message.rejected.map((line) => (
                                   <div key={line} className="copilot-chip copilot-chip--rejected">

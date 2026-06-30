@@ -27,7 +27,7 @@ export async function layoutSchema(schema: Schema): Promise<TablePosition[]> {
     },
     children: schema.tables.map((table) => ({
       id: table.id,
-      width: NODE_WIDTH,
+      width: table.width ?? NODE_WIDTH,
       height: tableNodeHeight(table.fields.length),
     })),
     edges: schema.relationships.map((relationship) => ({

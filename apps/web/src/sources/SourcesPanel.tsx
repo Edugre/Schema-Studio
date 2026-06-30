@@ -1,5 +1,5 @@
 import { ParseError } from "@schema-studio/core";
-import { useCallback, useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
+import { useCallback, useRef, useState, type DragEvent, type ReactNode } from "react";
 
 import { useSchemaStore } from "../store/index.js";
 import { ChevronDownIcon, FileIcon, PanelOpenIcon, PlusIcon } from "../ui/icons.js";
@@ -96,9 +96,8 @@ export function SourcesPanel({
   const [dragActive, setDragActive] = useState(false);
   const [message, setMessage] = useState<PanelMessage>(null);
   const [busy, setBusy] = useState(false);
-  // Accordion: at most one source expanded at a time. `null` means all collapsed.
+  // Accordion: at most one source expanded at a time. `null` means all collapsed (the default).
   const [expandedSourceId, setExpandedSourceId] = useState<string | null>(null);
-  const didDefaultExpand = useRef(false);
 
   const sources = useSchemaStore((state) => state.sources);
   const schema = useSchemaStore((state) => state.schema);
@@ -112,14 +111,6 @@ export function SourcesPanel({
   const activeTable = selection.tableId
     ? schema.tables.find((table) => table.id === selection.tableId)
     : undefined;
-
-  // Open the first source once, when sources first load, so the panel isn't all-collapsed.
-  useEffect(() => {
-    if (!didDefaultExpand.current && sources.length > 0) {
-      didDefaultExpand.current = true;
-      setExpandedSourceId(sources[0]!.id);
-    }
-  }, [sources]);
 
   const toggleSource = (sourceId: string) => {
     setExpandedSourceId((current) => (current === sourceId ? null : sourceId));
@@ -355,25 +346,11 @@ export function SourcesPanel({
         ) : null}
 
         {schema.tables.length > 0 ? (
-          <label className="sources-panel__hint">
-            Active table{" "}
-            <select
-              className="sources-panel__table-select"
-              value={selection.tableId ?? ""}
-              onChange={(event) => {
-                const tableId = event.target.value;
-                selectTable(tableId || undefined);
-              }}
-            >
-              <option value="">Select a table…</option>
-              {schema.tables.map((table) => (
-                <option key={table.id} value={table.id}>
-                  {table.name}
-                </option>
-              ))}
-            </select>
-            {activeTable ? " — click a field to add it." : " — required to add individual fields."}
-          </label>
+          <p className="sources-panel__hint">
+            {activeTable
+              ? `Active table: ${activeTable.name} — click a field below to add it.`
+              : "Pick an active table from the canvas, then click a field to add it."}
+          </p>
         ) : (
           <p className="sources-panel__hint">
             Build a table from a file, or add tables on the canvas, then add individual fields.

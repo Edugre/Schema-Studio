@@ -333,6 +333,68 @@
   background: var(--border-subtle);
 }
 
+.canvas-tools__active {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 2px;
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.canvas-tools__select {
+  height: 24px;
+  max-width: 160px;
+  padding: 0 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+/* Custom canvas controls (zoom / fit / fullscreen / lock) — bottom-left cluster. */
+.canvas-controls {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 9999px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface);
+  box-shadow: var(--shadow-node);
+}
+
+.canvas-controls__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 9999px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.canvas-controls__btn:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.canvas-controls__btn.is-active {
+  background: var(--accent-bg);
+  color: var(--accent-text);
+}
+
 /* ReactFlow controls/minimap — themed for both appearances. */
 .react-flow__controls {
   box-shadow: var(--shadow-node);
@@ -372,7 +434,8 @@
 
 /* ---- Table nodes ---- */
 .table-node {
-  min-width: 200px;
+  position: relative;
+  min-width: 160px;
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
   background: var(--surface);
@@ -487,6 +550,47 @@
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-muted);
+}
+
+/* Inline field-name / field-type editors (double-click a field name or its type chip). */
+.table-node__field-input {
+  flex: 1;
+  min-width: 0;
+  height: 22px;
+  padding: 0 6px;
+  font: inherit;
+  background: var(--surface);
+  border: none;
+  border-radius: 4px;
+  color: var(--text);
+  outline: 1px solid var(--accent);
+}
+
+/* Name editor takes the whole row (the type chip and remove button are hidden while editing). */
+.table-node__field-input--wide {
+  margin-right: 4px;
+}
+
+.table-node__type-input {
+  width: 84px;
+  height: 20px;
+  padding: 0 5px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--surface);
+  border: none;
+  border-radius: 4px;
+  color: var(--text);
+  outline: 1px solid var(--accent);
+}
+
+/* Horizontal resize handles (shown when a table node is selected). React Flow positions the
+   left/right controls; we only widen the grab area and set the cursor. */
+.table-node__resize {
+  width: 8px;
+  border: none;
+  background: transparent;
+  cursor: ew-resize;
 }
 
 .table-node__remove {

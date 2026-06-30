@@ -10,8 +10,6 @@ export function ProjectsBar() {
     ready,
     error,
     dismissError,
-    newProject,
-    deleteProject,
     renameProject,
     exportProject,
     importProject,
@@ -76,17 +74,6 @@ export function ProjectsBar() {
       )}
 
       <div className="projects-bar__actions">
-        <button type="button" onClick={newProject} disabled={!ready} title="New project">
-          New
-        </button>
-        <button
-          type="button"
-          onClick={() => activeId && deleteProject(activeId)}
-          disabled={!ready || !activeId}
-          title="Delete project"
-        >
-          Delete
-        </button>
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}

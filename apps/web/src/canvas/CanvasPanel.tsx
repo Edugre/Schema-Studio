@@ -1,7 +1,6 @@
 import {
   Background,
   BackgroundVariant,
-  Controls,
   MarkerType,
   MiniMap,
   ReactFlow,
@@ -10,11 +9,22 @@ import {
 } from "@xyflow/react";
 import type { Connection, EdgeChange, NodeChange, ReactFlowInstance } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useSchemaStore } from "../store/index.js";
 import { useSuggestions } from "../suggest/index.js";
-import { ChevronLeftIcon, PlusIcon, RedoIcon, UndoIcon } from "../ui/icons.js";
+import {
+  ChevronLeftIcon,
+  FitViewIcon,
+  LockIcon,
+  MaximizeIcon,
+  MinimizeIcon,
+  MinusIcon,
+  PlusIcon,
+  RedoIcon,
+  UndoIcon,
+  UnlockIcon,
+} from "../ui/icons.js";
 import { PreviewOverlay } from "./PreviewOverlay.js";
 import { registerArrangeHandler } from "./arrangeBridge.js";
 import { RelationshipEdge } from "./RelationshipEdge.js";
@@ -93,6 +103,30 @@ export function CanvasPanel({
   const [edges, setEdges, onEdgesChange] = useEdgesState<RelationshipFlowEdge>([]);
 
   const instanceRef = useRef<ReactFlowInstance<TableFlowNode, RelationshipFlowEdge> | null>(null);
+  // The canvas section, used as the Fullscreen API target.
+  const containerRef = useRef<HTMLElement>(null);
+  // Interactivity lock: when on, nodes/edges can't be dragged, selected, or connected.
+  const [locked, setLocked] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Keep the fullscreen icon in sync whether the user toggles via the button or Esc.
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(document.fullscreenElement === containerRef.current);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    if (document.fullscreenElement) {
+      void document.exitFullscreen();
+    } else {
+      void containerRef.current?.requestFullscreen();
+    }
+  }, []);
+
+  const zoomIn = useCallback(() => instanceRef.current?.zoomIn({ duration: 200 }), []);
+  const zoomOut = useCallback(() => instanceRef.current?.zoomOut({ duration: 200 }), []);
+  const fitView = useCallback(() => instanceRef.current?.fitView({ duration: 300 }), []);
 
   // The store owns structure + positions; ReactFlow's local arrays carry only the
   // ephemeral selection/measured-size state, which we preserve on each re-derive.
@@ -231,7 +265,7 @@ export function CanvasPanel({
   const relationshipCount = relationships.length;
 
   return (
-    <section className="panel canvas-panel">
+    <section className="panel canvas-panel" ref={containerRef}>
       <div className="panel-body">
         <div className="canvas-status">
           <button type="button" className="canvas-back" onClick={onBack} title="Back to projects">
@@ -305,6 +339,26 @@ export function CanvasPanel({
           >
             <RedoIcon size={15} />
           </button>
+          {tableCount > 0 ? (
+            <>
+              <span className="canvas-tools__divider" />
+              <label className="canvas-tools__active">
+                Active table
+                <select
+                  className="canvas-tools__select"
+                  value={selectedTableId ?? ""}
+                  onChange={(event) => selectTable(event.target.value || undefined)}
+                >
+                  <option value="">Select…</option>
+                  {tables.map((table) => (
+                    <option key={table.id} value={table.id}>
+                      {table.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </>
+          ) : null}
         </div>
         <ReactFlow
           className="schema-canvas"
@@ -322,12 +376,62 @@ export function CanvasPanel({
             instanceRef.current = instance;
           }}
           deleteKeyCode={["Delete", "Backspace"]}
+          nodesDraggable={!locked}
+          nodesConnectable={!locked}
+          elementsSelectable={!locked}
           fitView
         >
           <Background variant={BackgroundVariant.Dots} gap={24} size={1} />
-          <Controls />
           <MiniMap pannable zoomable />
           {preview ? <PreviewOverlay preview={preview} /> : null}
+          <div className="canvas-controls">
+            <button
+              type="button"
+              className="canvas-controls__btn"
+              onClick={zoomIn}
+              title="Zoom in"
+              aria-label="Zoom in"
+            >
+              <PlusIcon size={15} />
+            </button>
+            <button
+              type="button"
+              className="canvas-controls__btn"
+              onClick={zoomOut}
+              title="Zoom out"
+              aria-label="Zoom out"
+            >
+              <MinusIcon size={15} />
+            </button>
+            <button
+              type="button"
+              className="canvas-controls__btn"
+              onClick={fitView}
+              title="Fit view"
+              aria-label="Fit view"
+            >
+              <FitViewIcon size={15} />
+            </button>
+            <button
+              type="button"
+              className="canvas-controls__btn"
+              onClick={toggleFullscreen}
+              title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+              aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+            >
+              {isFullscreen ? <MinimizeIcon size={15} /> : <MaximizeIcon size={15} />}
+            </button>
+            <button
+              type="button"
+              className={`canvas-controls__btn${locked ? " is-active" : ""}`}
+              onClick={() => setLocked((value) => !value)}
+              title={locked ? "Unlock canvas" : "Lock canvas"}
+              aria-label={locked ? "Unlock canvas" : "Lock canvas"}
+              aria-pressed={locked}
+            >
+              {locked ? <LockIcon size={15} /> : <UnlockIcon size={15} />}
+            </button>
+          </div>
         </ReactFlow>
       </div>
     </section>
