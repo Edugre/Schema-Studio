@@ -566,6 +566,11 @@
   outline: 1px solid var(--accent);
 }
 
+/* Name editor takes the whole row (the type chip and remove button are hidden while editing). */
+.table-node__field-input--wide {
+  margin-right: 4px;
+}
+
 .table-node__type-input {
   width: 84px;
   height: 20px;

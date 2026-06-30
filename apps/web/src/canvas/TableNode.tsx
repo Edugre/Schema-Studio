@@ -82,8 +82,10 @@ function FieldRow({ table, field }: { table: Table; field: Field }) {
       />
 
       {editing === "name" ? (
+        // While renaming, the input spans the whole row (no type chip / remove competing for
+        // width) so the full field name is easy to read and edit.
         <input
-          className="table-node__field-input nodrag"
+          className="table-node__field-input table-node__field-input--wide nodrag"
           value={draft}
           autoFocus
           onClick={(event) => event.stopPropagation()}
@@ -92,59 +94,61 @@ function FieldRow({ table, field }: { table: Table; field: Field }) {
           onKeyDown={onKeyDown}
         />
       ) : (
-        <span
-          className="table-node__field-name"
-          title="Double-click to rename"
-          onDoubleClick={(event) => {
-            event.stopPropagation();
-            startEdit("name");
-          }}
-        >
-          {field.name}
-        </span>
-      )}
-      {field.fk ? <span className="table-node__fk">FK</span> : null}
-      {editing === "type" ? (
         <>
-          <input
-            className="table-node__type-input nodrag"
-            list="table-node-field-types"
-            value={draft}
-            autoFocus
-            onClick={(event) => event.stopPropagation()}
-            onChange={(event) => setDraft(event.target.value)}
-            onBlur={commit}
-            onKeyDown={onKeyDown}
-          />
-          <datalist id="table-node-field-types">
-            {COMMON_FIELD_TYPES.map((type) => (
-              <option key={type} value={type} />
-            ))}
-          </datalist>
+          <span
+            className="table-node__field-name"
+            title="Double-click to rename"
+            onDoubleClick={(event) => {
+              event.stopPropagation();
+              startEdit("name");
+            }}
+          >
+            {field.name}
+          </span>
+          {field.fk ? <span className="table-node__fk">FK</span> : null}
+          {editing === "type" ? (
+            <>
+              <input
+                className="table-node__type-input nodrag"
+                list="table-node-field-types"
+                value={draft}
+                autoFocus
+                onClick={(event) => event.stopPropagation()}
+                onChange={(event) => setDraft(event.target.value)}
+                onBlur={commit}
+                onKeyDown={onKeyDown}
+              />
+              <datalist id="table-node-field-types">
+                {COMMON_FIELD_TYPES.map((type) => (
+                  <option key={type} value={type} />
+                ))}
+              </datalist>
+            </>
+          ) : (
+            <span
+              className="table-node__type"
+              title="Double-click to edit type"
+              onDoubleClick={(event) => {
+                event.stopPropagation();
+                startEdit("type");
+              }}
+            >
+              {field.type}
+            </span>
+          )}
+          <button
+            type="button"
+            className="table-node__remove"
+            title="Remove field"
+            onClick={(event) => {
+              event.stopPropagation();
+              removeField(table.id, field.id);
+            }}
+          >
+            ×
+          </button>
         </>
-      ) : (
-        <span
-          className="table-node__type"
-          title="Double-click to edit type"
-          onDoubleClick={(event) => {
-            event.stopPropagation();
-            startEdit("type");
-          }}
-        >
-          {field.type}
-        </span>
       )}
-      <button
-        type="button"
-        className="table-node__remove"
-        title="Remove field"
-        onClick={(event) => {
-          event.stopPropagation();
-          removeField(table.id, field.id);
-        }}
-      >
-        ×
-      </button>
       <Handle
         type="source"
         position={Position.Right}
