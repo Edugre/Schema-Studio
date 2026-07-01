@@ -160,6 +160,85 @@ describe("schemaStore", () => {
       store.getState().undo();
       expect(store.getState().schema.tables[0]?.fields[0]?.type).toBe("text");
     });
+
+    it("toggles pk through the validated path as an undoable step", () => {
+      const store = createSchemaStore({ makeId: makeTestIds() });
+      store.getState().addTable("users");
+      const tableId = store.getState().schema.tables[0]!.id;
+      store.getState().addField(tableId, "id", { pk: false });
+      const fieldId = store.getState().schema.tables[0]!.fields[0]!.id;
+
+      const result = store.getState().togglePk(tableId, fieldId);
+      expect(result.rejected).toEqual([]);
+      expect(result.applied[0]).toMatchObject({ op: "set_pk", tableIds: [tableId] });
+      expect(store.getState().schema.tables[0]!.fields[0]!.pk).toBe(true);
+
+      store.getState().undo();
+      expect(store.getState().schema.tables[0]!.fields[0]!.pk).toBe(false);
+    });
+  });
+
+  describe("relationships", () => {
+    // Seed users(id, pk) ← posts(author_id, fk) linked 1:N, returning the ids the store commands need.
+    function seedLink(store: ReturnType<typeof createSchemaStore>) {
+      store.getState().addTable("users");
+      const usersId = store.getState().schema.tables[0]!.id;
+      store.getState().addField(usersId, "id", { pk: true });
+      const userIdField = store.getState().schema.tables[0]!.fields[0]!.id;
+
+      store.getState().addTable("posts");
+      const postsId = store.getState().schema.tables[1]!.id;
+      store.getState().addField(postsId, "author_id", { fk: true });
+      const authorIdField = store.getState().schema.tables[1]!.fields[0]!.id;
+
+      store.getState().addRelationship(postsId, authorIdField, usersId, userIdField);
+      const relationshipId = store.getState().schema.relationships[0]!.id;
+      return { usersId, postsId, relationshipId };
+    }
+
+    it("adds then removes a relationship through applyActions, undoably", () => {
+      const store = createSchemaStore({ makeId: makeTestIds() });
+      const { relationshipId } = seedLink(store);
+      expect(store.getState().schema.relationships).toHaveLength(1);
+
+      const result = store.getState().removeRelationship(relationshipId);
+      expect(result.rejected).toEqual([]);
+      expect(result.applied[0]).toMatchObject({ op: "remove_relationship", relationshipId });
+      expect(store.getState().schema.relationships).toHaveLength(0);
+
+      store.getState().undo();
+      expect(store.getState().schema.relationships).toHaveLength(1);
+    });
+
+    it("sets cardinality through applyActions, undoably", () => {
+      const store = createSchemaStore({ makeId: makeTestIds() });
+      const { relationshipId } = seedLink(store);
+      expect(store.getState().schema.relationships[0]!.cardinality).toBe("1:N");
+
+      const result = store.getState().setCardinality(relationshipId, "N:M");
+      expect(result.rejected).toEqual([]);
+      expect(result.applied[0]).toMatchObject({ op: "set_cardinality", relationshipId });
+      expect(store.getState().schema.relationships[0]!.cardinality).toBe("N:M");
+
+      store.getState().undo();
+      expect(store.getState().schema.relationships[0]!.cardinality).toBe("1:N");
+    });
+
+    it("surfaces a rejection for an unknown relationship id without mutating schema", () => {
+      const store = createSchemaStore({ makeId: makeTestIds() });
+      seedLink(store);
+      const before = structuredClone(store.getState().schema);
+
+      const removed = store.getState().removeRelationship("nope");
+      expect(removed.applied).toEqual([]);
+      expect(removed.rejected[0]?.reason).toContain("not found");
+
+      const carded = store.getState().setCardinality("nope", "1:1");
+      expect(carded.applied).toEqual([]);
+      expect(carded.rejected[0]?.reason).toContain("not found");
+
+      expect(store.getState().schema).toEqual(before);
+    });
   });
 
   describe("sources", () => {

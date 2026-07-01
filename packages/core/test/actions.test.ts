@@ -598,4 +598,139 @@ describe("applyActions", () => {
       expect(result.rejected).toHaveLength(1);
     });
   });
+
+  describe("set_cardinality", () => {
+    it("changes the cardinality of the matching relationship by table/field names", () => {
+      const makeId = makeTestIds();
+      const schema = seedSchema(makeId);
+      const relationshipId = schema.relationships[0]!.id;
+
+      const result = applyActions(
+        schema,
+        [
+          {
+            op: "set_cardinality",
+            from_table: "posts",
+            from_field: "author_id",
+            to_table: "users",
+            to_field: "id",
+            cardinality: "N:M",
+          },
+        ],
+        { makeId },
+      );
+
+      expect(result.rejected).toEqual([]);
+      expect(result.applied[0]).toMatchObject({ op: "set_cardinality", relationshipId });
+      expect(result.schema.relationships[0]!.cardinality).toBe("N:M");
+    });
+
+    it("matches table and field names case-insensitively", () => {
+      const makeId = makeTestIds();
+      const schema = seedSchema(makeId);
+
+      const result = applyActions(
+        schema,
+        [
+          {
+            op: "set_cardinality",
+            from_table: "Posts",
+            from_field: "Author_Id",
+            to_table: "Users",
+            to_field: "Id",
+            cardinality: "1:1",
+          },
+        ],
+        { makeId },
+      );
+
+      expect(result.rejected).toEqual([]);
+      expect(result.schema.relationships[0]!.cardinality).toBe("1:1");
+    });
+
+    it("rejects when no matching relationship exists and leaves the schema untouched", () => {
+      const makeId = makeTestIds();
+      const schema = seedSchema(makeId);
+
+      const result = applyActions(
+        schema,
+        [
+          {
+            op: "set_cardinality",
+            from_table: "users",
+            from_field: "email",
+            to_table: "posts",
+            to_field: "id",
+            cardinality: "N:M",
+          },
+        ],
+        { makeId },
+      );
+
+      expect(result.applied).toEqual([]);
+      expect(result.rejected[0]?.reason).toContain("no relationship");
+      expect(result.schema).toEqual(schema);
+    });
+
+    it("rejects unknown tables or fields", () => {
+      const makeId = makeTestIds();
+      const schema = seedSchema(makeId);
+
+      const missingTable = applyActions(
+        schema,
+        [
+          {
+            op: "set_cardinality",
+            from_table: "ghost",
+            from_field: "author_id",
+            to_table: "users",
+            to_field: "id",
+            cardinality: "1:1",
+          },
+        ],
+        { makeId },
+      );
+      expect(missingTable.rejected[0]?.reason).toBe("table 'ghost' not found");
+
+      const missingField = applyActions(
+        schema,
+        [
+          {
+            op: "set_cardinality",
+            from_table: "posts",
+            from_field: "missing",
+            to_table: "users",
+            to_field: "id",
+            cardinality: "1:1",
+          },
+        ],
+        { makeId },
+      );
+      expect(missingField.rejected[0]?.reason).toBe("field 'missing' not found in table 'posts'");
+    });
+
+    it("rejects invalid cardinality at validation", () => {
+      const makeId = makeTestIds();
+      const schema = seedSchema(makeId);
+
+      const result = applyActions(
+        schema,
+        [
+          {
+            op: "set_cardinality",
+            from_table: "posts",
+            from_field: "author_id",
+            to_table: "users",
+            to_field: "id",
+            cardinality: "bad",
+          },
+        ],
+        { makeId },
+      );
+
+      expect(result.applied).toEqual([]);
+      expect(result.rejected).toHaveLength(1);
+      expect(result.schema).toEqual(schema);
+    });
+  });
 });
