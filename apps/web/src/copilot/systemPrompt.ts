@@ -1,5 +1,11 @@
-import type { Schema, Source } from "@schema-studio/core";
-import { detectJoinKeys, detectPrimaryKeys } from "@schema-studio/core";
+import type { Schema, Source, TargetId } from "@schema-studio/core";
+import {
+  DEFAULT_TARGET,
+  describeTargetForPrompt,
+  detectJoinKeys,
+  detectPrimaryKeys,
+  getTargetProfile,
+} from "@schema-studio/core";
 
 function summarizeSchema(schema: Schema) {
   const tableById = new Map(schema.tables.map((table) => [table.id, table]));
@@ -84,20 +90,35 @@ const ACTION_PROTOCOL = `Allowed action ops (use table/field NAMES, not internal
 - remove_table: { "op": "remove_table", "table": string }
 - rename_table: { "op": "rename_table", "table": string, "new_name": string }
 - add_relationship: { "op": "add_relationship", "from_table": string, "from_field": string, "to_table": string, "to_field": string, "cardinality"?: "1:1" | "1:N" | "N:M" }
-- remove_relationship: { "op": "remove_relationship", "from_table": string, "from_field": string, "to_table": string, "to_field": string }`;
+- remove_relationship: { "op": "remove_relationship", "from_table": string, "from_field": string, "to_table": string, "to_field": string }
+- set_pk: { "op": "set_pk", "table": string, "field": string, "pk": boolean }
+- set_type: { "op": "set_type", "table": string, "field": string, "type": string }
+- set_cardinality: { "op": "set_cardinality", "from_table": string, "from_field": string, "to_table": string, "to_field": string, "cardinality": "1:1" | "1:N" | "N:M" }`;
 
-/** System prompt for the schema copilot — includes live schema, sources with samples, the action protocol, and deterministic detector findings. */
-export function buildCopilotSystemPrompt(schema: Schema, sources: Source[]): string {
+/**
+ * System prompt for the schema copilot — includes the live schema, sources with samples, the
+ * target-stack profile (so types/keys/relationships round-trip through the export), the action
+ * protocol, and deterministic detector findings.
+ */
+export function buildCopilotSystemPrompt(
+  schema: Schema,
+  sources: Source[],
+  targetId: TargetId = DEFAULT_TARGET,
+): string {
   const findings = summarizeDetectorFindings(sources);
+  const target = getTargetProfile(targetId);
 
   return [
-    "You are Schema Studio's schema design copilot.",
-    "You help users derive a relational schema from raw source files by reasoning over actual sample values — not just column names.",
+    `You are Schema Studio's schema design copilot for ${target.label}.`,
+    "You help users derive a relational schema from raw source files by reasoning over actual sample values — not just column names — and you model toward the target stack, in its own types and idioms.",
+    "",
+    describeTargetForPrompt(target),
     "",
     "Before proposing actions, analyze the data:",
     "- Spot columns that likely refer to the same entity across sources (candidate join keys).",
     "- Compare sample value formats (leading zeros, prefixes, casing) and warn when joins need normalization.",
     "- Flag grain mismatches (e.g. one file is per-entity, another is per-transaction).",
+    "- Choose column types from the target's vocabulary above, and set primary keys before adding foreign keys that reference them.",
     "- Mention uncertainties in your reply; do not silently assume joins will work.",
     "",
     "When the user asks you to change the schema, emit valid actions. When they only ask a question, actions may be empty.",

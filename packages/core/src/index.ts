@@ -27,6 +27,14 @@ export {
 } from "./detect/index.js";
 export type { SqlDialect } from "./export/index.js";
 export { toDbml, toPrisma, toSql } from "./export/index.js";
+export type { TargetId, TargetProfile, TypeVocabularyEntry } from "./target/index.js";
+export {
+  DEFAULT_TARGET,
+  TARGET_PROFILES,
+  TargetIdSchema,
+  describeTargetForPrompt,
+  getTargetProfile,
+} from "./target/index.js";
 export type { Cardinality, Field, Relationship, Schema, Table } from "./model.js";
 export {
   CardinalitySchema,

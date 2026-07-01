@@ -1,4 +1,4 @@
-import { emptySchema } from "@schema-studio/core";
+import { SchemaActionSchema, emptySchema } from "@schema-studio/core";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -58,6 +58,35 @@ describe("buildCopilotSystemPrompt", () => {
     expect(prompt).toContain("Detector findings");
     expect(prompt).toContain("covered_entities.csv.grant_number");
     expect(prompt).toContain("strip leading zeros");
+  });
+
+  it("frames the prompt for the default Postgres target with its type vocabulary", () => {
+    const prompt = buildCopilotSystemPrompt(emptySchema(), []);
+
+    expect(prompt).toContain("Target: PostgreSQL");
+    expect(prompt).toContain("integer");
+    // A target-specific gotcha that keeps content-aware joins honest.
+    expect(prompt).toContain("leading zeros");
+  });
+
+  it("switches vocabulary and idioms when the target is Prisma", () => {
+    const prompt = buildCopilotSystemPrompt(emptySchema(), [], "prisma");
+
+    expect(prompt).toContain("Target: Prisma");
+    expect(prompt).toContain("@id");
+    expect(prompt).not.toContain("Target: PostgreSQL");
+  });
+
+  it("documents every core action op so the copilot can emit all of them", () => {
+    const prompt = buildCopilotSystemPrompt(emptySchema(), []);
+    // Guards against protocol drift: if a new op is added to core's union, this fails until
+    // it's documented in the prompt (the reason the copilot couldn't emit set_pk/set_cardinality).
+    const ops = SchemaActionSchema.options.map((option) => option.shape.op.value);
+
+    expect(ops).toContain("set_cardinality");
+    for (const op of ops) {
+      expect(prompt).toContain(op);
+    }
   });
 });
 
