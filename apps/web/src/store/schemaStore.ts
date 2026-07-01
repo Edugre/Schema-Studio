@@ -138,6 +138,54 @@ function rejectUnknownField(tableId: string, fieldId: string, op: string): RunAc
   };
 }
 
+type ResolvedRelationshipEndpoints = {
+  fromTable: Table;
+  fromField: Field;
+  toTable: Table;
+  toField: Field;
+};
+
+/**
+ * Resolve a relationship id to its `{table, field}` endpoint objects so a store command can
+ * rebuild a name-based action for `applyActions` (the protocol addresses tables/fields by name,
+ * not id). Returns a `RunActionsResult` carrying a surfaced rejection when the id is unknown or
+ * its endpoints are dangling.
+ */
+function resolveRelationshipEndpoints(
+  schema: Schema,
+  relationshipId: string,
+  op: string,
+): ResolvedRelationshipEndpoints | RunActionsResult {
+  const relationship = schema.relationships.find((candidate) => candidate.id === relationshipId);
+  if (!relationship) {
+    return {
+      applied: [],
+      rejected: [
+        { action: { op, relationshipId }, reason: `relationship '${relationshipId}' not found` },
+      ],
+    };
+  }
+
+  const fromTable = findTableById(schema, relationship.fromTable);
+  const toTable = findTableById(schema, relationship.toTable);
+  const fromField = fromTable && findFieldById(fromTable, relationship.fromField);
+  const toField = toTable && findFieldById(toTable, relationship.toField);
+
+  if (!fromTable || !fromField || !toTable || !toField) {
+    return {
+      applied: [],
+      rejected: [
+        {
+          action: { op, relationshipId },
+          reason: `relationship '${relationshipId}' has dangling endpoints`,
+        },
+      ],
+    };
+  }
+
+  return { fromTable, fromField, toTable, toField };
+}
+
 function captureSnapshot(
   state: Pick<SchemaStore, "schema" | "sources" | "selection">,
 ): StoreSnapshot {
@@ -255,23 +303,17 @@ export function createSchemaStore(options?: CreateSchemaStoreOptions) {
         togglePk: (tableId, fieldId) => {
           const table = findTableById(get().schema, tableId);
           if (!table) {
-            return rejectUnknownTable(tableId, "toggle_pk");
+            return rejectUnknownTable(tableId, "set_pk");
           }
 
           const field = findFieldById(table, fieldId);
           if (!field) {
-            return rejectUnknownField(tableId, fieldId, "toggle_pk");
+            return rejectUnknownField(tableId, fieldId, "set_pk");
           }
 
-          commitSnapshot((draft) => {
-            const draftTable = findTableById(draft.schema, tableId);
-            const draftField = draftTable && findFieldById(draftTable, fieldId);
-            if (draftField) {
-              draftField.pk = !draftField.pk;
-            }
-          });
-
-          return { applied: [{ op: "toggle_pk", tableIds: [tableId] }], rejected: [] };
+          return runValidatedActions([
+            { op: "set_pk", table: table.name, field: field.name, pk: !field.pk },
+          ]);
         },
 
         renameField: (tableId, fieldId, name) => {
@@ -379,74 +421,48 @@ export function createSchemaStore(options?: CreateSchemaStoreOptions) {
         },
 
         removeRelationship: (relationshipId) => {
-          const relationship = get().schema.relationships.find(
-            (candidate) => candidate.id === relationshipId,
+          const endpoints = resolveRelationshipEndpoints(
+            get().schema,
+            relationshipId,
+            "remove_relationship",
           );
-          if (!relationship) {
-            return {
-              applied: [],
-              rejected: [
-                {
-                  action: { op: "remove_relationship", relationshipId },
-                  reason: `relationship '${relationshipId}' not found`,
-                },
-              ],
-            };
+          if ("rejected" in endpoints) {
+            return endpoints;
           }
 
-          commitSnapshot((draft) => {
-            draft.schema.relationships = draft.schema.relationships.filter(
-              (candidate) => candidate.id !== relationshipId,
-            );
-          });
-
-          return {
-            applied: [
-              {
-                op: "remove_relationship",
-                tableIds: [relationship.fromTable, relationship.toTable],
-                relationshipId,
-              },
-            ],
-            rejected: [],
-          };
+          const { fromTable, fromField, toTable, toField } = endpoints;
+          return runValidatedActions([
+            {
+              op: "remove_relationship",
+              from_table: fromTable.name,
+              from_field: fromField.name,
+              to_table: toTable.name,
+              to_field: toField.name,
+            },
+          ]);
         },
 
         setCardinality: (relationshipId, cardinality) => {
-          const relationship = get().schema.relationships.find(
-            (candidate) => candidate.id === relationshipId,
+          const endpoints = resolveRelationshipEndpoints(
+            get().schema,
+            relationshipId,
+            "set_cardinality",
           );
-          if (!relationship) {
-            return {
-              applied: [],
-              rejected: [
-                {
-                  action: { op: "set_cardinality", relationshipId, cardinality },
-                  reason: `relationship '${relationshipId}' not found`,
-                },
-              ],
-            };
+          if ("rejected" in endpoints) {
+            return endpoints;
           }
 
-          commitSnapshot((draft) => {
-            const draftRelationship = draft.schema.relationships.find(
-              (candidate) => candidate.id === relationshipId,
-            );
-            if (draftRelationship) {
-              draftRelationship.cardinality = cardinality;
-            }
-          });
-
-          return {
-            applied: [
-              {
-                op: "set_cardinality",
-                tableIds: [relationship.fromTable, relationship.toTable],
-                relationshipId,
-              },
-            ],
-            rejected: [],
-          };
+          const { fromTable, fromField, toTable, toField } = endpoints;
+          return runValidatedActions([
+            {
+              op: "set_cardinality",
+              from_table: fromTable.name,
+              from_field: fromField.name,
+              to_table: toTable.name,
+              to_field: toField.name,
+              cardinality,
+            },
+          ]);
         },
 
         moveTable: (tableId, x, y) => {

@@ -29,6 +29,8 @@ function describeAction(action: unknown): string {
       return `link ${String(payload["from_table"] ?? "")}.${String(payload["from_field"] ?? "")} → ${String(payload["to_table"] ?? "")}.${String(payload["to_field"] ?? "")}`;
     case "remove_relationship":
       return `unlink ${String(payload["from_table"] ?? "")}.${String(payload["from_field"] ?? "")} → ${String(payload["to_table"] ?? "")}.${String(payload["to_field"] ?? "")}`;
+    case "set_cardinality":
+      return `set ${String(payload["from_table"] ?? "")}.${String(payload["from_field"] ?? "")} → ${String(payload["to_table"] ?? "")}.${String(payload["to_field"] ?? "")} cardinality to ${String(payload["cardinality"] ?? "")}`;
     default:
       return op;
   }
