@@ -8,3 +8,7 @@ local-data/
 
 # Design-reference bundles (HTML mockups + preview-only runtime)
 design_handoff_*/
+
+# Bundled demo dataset — fixture data, kept in its authored form
+apps/web/public/demo/*.csv
+apps/web/public/demo/*.json

@@ -1,0 +1,72 @@
+[
+  {
+    "id": "CE-40021",
+    "entity_name": "Riverside Community Health, Inc.",
+    "entity_type": "Federally Qualified Health Center",
+    "grant_num": "489012",
+    "state": "CA"
+  },
+  {
+    "id": "CE-40022",
+    "entity_name": "North Valley Family Health Network",
+    "entity_type": "Federally Qualified Health Center",
+    "grant_num": "512430",
+    "state": "CA"
+  },
+  {
+    "id": "CE-40023",
+    "entity_name": "Lakeside Health Partners",
+    "entity_type": "Federally Qualified Health Center",
+    "grant_num": "733198",
+    "state": "MN"
+  },
+  {
+    "id": "CE-40024",
+    "entity_name": "Gulf Coast Wellness Alliance",
+    "entity_type": "Federally Qualified Health Center",
+    "grant_num": "618775",
+    "state": "AL"
+  },
+  {
+    "id": "CE-40025",
+    "entity_name": "Prairie Rose Medical Group",
+    "entity_type": "Rural Health Clinic",
+    "grant_num": "904561",
+    "state": "ND"
+  },
+  {
+    "id": "CE-40026",
+    "entity_name": "Cascade Neighborhood Health",
+    "entity_type": "Federally Qualified Health Center",
+    "grant_num": "287340",
+    "state": "OR"
+  },
+  {
+    "id": "CE-40027",
+    "entity_name": "Summit Ridge Community Care",
+    "entity_type": "Federally Qualified Health Center",
+    "grant_num": "451207",
+    "state": "CO"
+  },
+  {
+    "id": "CE-40028",
+    "entity_name": "Harbor Point Family Health",
+    "entity_type": "Federally Qualified Health Center",
+    "grant_num": "688021",
+    "state": "MA"
+  },
+  {
+    "id": "CE-40029",
+    "entity_name": "Evergreen Disproportionate Share Hospital",
+    "entity_type": "Disproportionate Share Hospital",
+    "grant_num": "771905",
+    "state": "WA"
+  },
+  {
+    "id": "CE-40030",
+    "entity_name": "Midtown Ryan White Program",
+    "entity_type": "Ryan White HIV/AIDS Program",
+    "grant_num": "630844",
+    "state": "IL"
+  }
+]
