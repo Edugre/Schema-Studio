@@ -1,7 +1,9 @@
+import { TARGET_PROFILES, TargetIdSchema, type TargetId } from "@schema-studio/core";
 import { useState, type ReactNode } from "react";
 
 import { useModelPreference } from "../ai/modelPreference.js";
 import { useModels } from "../ai/useModels.js";
+import { useTargetPreference } from "../ai/targetPreference.js";
 import { useApiKeyContext } from "../copilot/ApiKeyContext.js";
 import { useAutoDraftPreference } from "../copilot/autoDraftPreference.js";
 import { useRerankPreference } from "../suggest/rerankPreference.js";
@@ -115,6 +117,7 @@ function ApiKeysSection({ onAddKey }: { onAddKey: () => void }) {
   const { enabled: autoDraft, setEnabled: setAutoDraft } = useAutoDraftPreference();
   const { model, setModel } = useModelPreference();
   const { models, loading: modelsLoading } = useModels();
+  const { target, setTarget } = useTargetPreference();
 
   const hasKey = apiKey.trim().length > 0;
 
@@ -245,6 +248,31 @@ function ApiKeysSection({ onAddKey }: { onAddKey: () => void }) {
         {hasKey
           ? "Pulled live from your key’s available models, with current models as a fallback."
           : "Add a key to load the exact models it can access. The current models are shown until then."}
+      </p>
+
+      <h2 className="settings__section-heading">Target database</h2>
+      <p className="settings__field-label">
+        The stack Copilot models toward. It proposes column types, keys, and relationships in this
+        target’s vocabulary and idioms so they round-trip through the export.
+      </p>
+      <div className="settings__field-row">
+        <label className="settings__field settings__field--model">
+          <span className="settings__field-name">Target</span>
+          <select
+            className="settings__select"
+            value={target}
+            onChange={(event) => setTarget(event.target.value as TargetId)}
+          >
+            {TargetIdSchema.options.map((id) => (
+              <option key={id} value={id}>
+                {TARGET_PROFILES[id].label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <p className="settings__hint">
+        {`Copilot warns about ${TARGET_PROFILES[target].label}-specific pitfalls — e.g. keeping leading-zero identifiers as text so joins don’t break.`}
       </p>
 
       <h2 className="settings__section-heading">AI-ranked suggestions</h2>

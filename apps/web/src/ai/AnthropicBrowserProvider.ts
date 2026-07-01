@@ -7,7 +7,9 @@ import type {
   Schema,
   SuggestionDigest,
   SuggestionRanking,
+  TargetId,
 } from "@schema-studio/core";
+import { DEFAULT_TARGET } from "@schema-studio/core";
 
 import { buildCopilotSystemPrompt, buildRerankSystemPrompt } from "../copilot/systemPrompt.js";
 import { parseCopilotResponse } from "../copilot/parseResponse.js";
@@ -26,6 +28,7 @@ export class AnthropicBrowserProvider implements AiProvider {
   constructor(
     private readonly apiKey: string,
     private readonly model: string = DEFAULT_MODEL,
+    private readonly target: TargetId = DEFAULT_TARGET,
   ) {}
 
   async propose(
@@ -34,7 +37,7 @@ export class AnthropicBrowserProvider implements AiProvider {
     message: string,
     history: ConversationTurn[] = [],
   ): Promise<AiProviderResult> {
-    const systemPrompt = buildCopilotSystemPrompt(schema, sources);
+    const systemPrompt = buildCopilotSystemPrompt(schema, sources, this.target);
     // The system prompt re-embeds the live schema + source samples each turn (the largest block).
     // Caching it means follow-up turns with an unchanged canvas reuse that prefix at ~0.1x cost;
     // history is sent after `system`, so it never invalidates this cache.
