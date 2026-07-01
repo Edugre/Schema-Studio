@@ -5,6 +5,7 @@ export { useAutoDraftPreference, readAutoDraftPreference } from "./autoDraftPref
 export { buildCopilotSystemPrompt } from "./systemPrompt.js";
 export { parseCopilotResponse } from "./parseResponse.js";
 export { COPILOT_RESPONSE_TOOL, parseToolUseResponse } from "./responseTool.js";
+export { PREVIEW_EXPORT_TOOL, runExportPreview } from "./exportPreviewTool.js";
 export {
   collectAffectedTableIds,
   formatRejectedAction,

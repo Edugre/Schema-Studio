@@ -8,6 +8,7 @@ import {
 } from "@schema-studio/core";
 
 import { COPILOT_RESPONSE_TOOL } from "./responseTool.js";
+import { PREVIEW_EXPORT_TOOL } from "./exportPreviewTool.js";
 
 function summarizeSchema(schema: Schema) {
   const tableById = new Map(schema.tables.map((table) => [table.id, table]));
@@ -141,7 +142,11 @@ export function buildCopilotSystemPrompt(
     'in past tense and then set "status" to "complete". Reserve "complete" with no actions for that',
     "final confirmation or for a plain question that needs no changes.",
     "",
-    `Return your response by calling the ${COPILOT_RESPONSE_TOOL.name} tool exactly once — put your`,
+    `Before finalizing a non-trivial change you may call the ${PREVIEW_EXPORT_TOOL.name} tool to see`,
+    "the migration your proposed actions would generate for the target and catch problems (bad types,",
+    "missing keys) before committing to them.",
+    "",
+    `Return your final response by calling the ${COPILOT_RESPONSE_TOOL.name} tool — put your`,
     'explanation in "reply", the schema actions in "actions" (empty for a plain question), and set',
     '"status". Do not answer in plain text.',
     "",

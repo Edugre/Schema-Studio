@@ -13,6 +13,7 @@ import { DEFAULT_TARGET } from "@schema-studio/core";
 
 import { buildCopilotSystemPrompt, buildRerankSystemPrompt } from "../copilot/systemPrompt.js";
 import { COPILOT_RESPONSE_TOOL, parseToolUseResponse } from "../copilot/responseTool.js";
+import { PREVIEW_EXPORT_TOOL, runExportPreview } from "../copilot/exportPreviewTool.js";
 import { parseRankingResponse } from "../suggest/rerank.js";
 import { DEFAULT_MODEL, parseModelsPage } from "./models.js";
 
@@ -20,13 +21,27 @@ const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_MODELS_URL = "https://api.anthropic.com/v1/models";
 const ANTHROPIC_VERSION = "2023-06-01";
 
-type AnthropicContentBlock = { type: string; text?: string; name?: string; input?: unknown };
+/** Cap on preview_export round-trips within a single propose() before we force a finalization. */
+const MAX_PREVIEW_ITERATIONS = 3;
+
+type AnthropicContentBlock = {
+  type: string;
+  text?: string;
+  name?: string;
+  input?: unknown;
+  id?: string;
+  tool_use_id?: string;
+  content?: unknown;
+};
 
 type AnthropicMessageResponse = {
   content: AnthropicContentBlock[];
 };
 
 type ToolSpec = { name: string; description: string; input_schema: unknown };
+type ToolChoice = { type: "tool"; name: string } | { type: "any" } | { type: "auto" };
+type MessageContent = string | AnthropicContentBlock[];
+type ProviderMessage = { role: "user" | "assistant"; content: MessageContent };
 
 export class AnthropicBrowserProvider implements AiProvider {
   constructor(
@@ -41,20 +56,53 @@ export class AnthropicBrowserProvider implements AiProvider {
     message: string,
     history: ConversationTurn[] = [],
   ): Promise<AiProviderResult> {
-    const systemPrompt = buildCopilotSystemPrompt(schema, sources, this.target);
     // The system prompt re-embeds the live schema + source samples each turn (the largest block).
     // Caching it means follow-up turns with an unchanged canvas reuse that prefix at ~0.1x cost;
     // history is sent after `system`, so it never invalidates this cache.
-    //
-    // Forcing the response tool (tool_choice) guarantees a well-formed { reply, actions, status }
-    // envelope, so the loop no longer dead-ends on a stray sentence outside JSON.
-    const data = await this.request(
-      systemPrompt,
-      [...history, { role: "user", content: message }],
-      [COPILOT_RESPONSE_TOOL],
-      { type: "tool", name: COPILOT_RESPONSE_TOOL.name },
-    );
+    const systemPrompt = buildCopilotSystemPrompt(schema, sources, this.target);
+    const tools = [PREVIEW_EXPORT_TOOL, COPILOT_RESPONSE_TOOL];
+    let messages: ProviderMessage[] = [...history, { role: "user", content: message }];
 
+    // Agentic tool loop: the model may call preview_export (read-only, in-memory) to inspect the
+    // migration its design would generate, then finalize with submit_schema_response. `tool_choice:
+    // any` forces a tool call every step, so the loop never dead-ends on a stray sentence.
+    for (let iteration = 0; iteration < MAX_PREVIEW_ITERATIONS; iteration += 1) {
+      const data = await this.request(systemPrompt, messages, tools, { type: "any" });
+
+      if (data.content.some((block) => isToolUse(block, COPILOT_RESPONSE_TOOL.name))) {
+        return this.finalizeResponse(data);
+      }
+
+      const previews = data.content.filter((block) => isToolUse(block, PREVIEW_EXPORT_TOOL.name));
+      if (previews.length === 0) {
+        // No recognized tool — parse whatever came back (text fallback) or surface it as blocked.
+        return this.finalizeResponse(data);
+      }
+
+      // Answer every preview call (the API requires a tool_result per tool_use) with the exported
+      // code, then let the model continue from what it saw.
+      const toolResults: AnthropicContentBlock[] = previews.map((preview) => ({
+        type: "tool_result",
+        tool_use_id: preview.id ?? "",
+        content: runExportPreview(schema, preview.input),
+      }));
+      messages = [
+        ...messages,
+        { role: "assistant", content: data.content },
+        { role: "user", content: toolResults },
+      ];
+    }
+
+    // Spent the preview budget without finalizing — force one submission so the turn still resolves.
+    const finalData = await this.request(systemPrompt, messages, [COPILOT_RESPONSE_TOOL], {
+      type: "tool",
+      name: COPILOT_RESPONSE_TOOL.name,
+    });
+    return this.finalizeResponse(finalData);
+  }
+
+  /** Parse a finalizing response, surfacing a malformed payload as a blocked turn. */
+  private finalizeResponse(data: AnthropicMessageResponse): AiProviderResult {
     const parsed = parseToolUseResponse(data.content);
     if ("error" in parsed) {
       // A malformed payload can't be acted on or revised — surface it and stop the loop.
@@ -64,7 +112,6 @@ export class AnthropicBrowserProvider implements AiProvider {
         status: "blocked",
       };
     }
-
     return parsed;
   }
 
@@ -136,9 +183,9 @@ export class AnthropicBrowserProvider implements AiProvider {
    */
   private async request(
     systemPrompt: string,
-    messages: Array<{ role: "user" | "assistant"; content: string }>,
+    messages: ProviderMessage[],
     tools?: ToolSpec[],
-    toolChoice?: { type: "tool"; name: string },
+    toolChoice?: ToolChoice,
   ): Promise<AnthropicMessageResponse> {
     const response = await fetch(ANTHROPIC_API_URL, {
       method: "POST",
@@ -165,4 +212,9 @@ export class AnthropicBrowserProvider implements AiProvider {
 /** First non-empty text block in an Anthropic content array, or undefined when there is none. */
 function firstText(content: AnthropicContentBlock[]): string | undefined {
   return content.find((block) => block.type === "text" && block.text)?.text;
+}
+
+/** Is this content block a tool_use call for the named tool? */
+function isToolUse(block: AnthropicContentBlock, name: string): boolean {
+  return block.type === "tool_use" && block.name === name;
 }
