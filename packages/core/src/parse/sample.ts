@@ -3,16 +3,51 @@ import type { FieldStats } from "./types.js";
 export const MAX_SCAN_ROWS = 1000;
 export const MAX_INFERENCE_VALUES = 200;
 export const MAX_SAMPLES = 5;
+/** Cap on retained row tuples (`Source.sampleRows`) — enough for multi-column uniqueness checks. */
+export const MAX_ROW_TUPLES = 200;
 
-function isNonEmpty(value: string | null | undefined): value is string {
-  return value !== null && value !== undefined && value !== "";
+/**
+ * Pick up to `limit` rows spread evenly across the whole file, preserving order. A head slice
+ * (`rows.slice(0, limit)`) is biased on sorted files — a status column sorted by status looks
+ * single-valued, and two files sorted differently can show zero join overlap because their scan
+ * windows cover different entity ranges. Even spacing samples every region of the file and is
+ * fully deterministic (same input, same rows), unlike a classic RNG reservoir.
+ */
+export function sampleScanRows<T>(rows: T[], limit: number = MAX_SCAN_ROWS): T[] {
+  if (rows.length <= limit) {
+    return rows;
+  }
+  const sampled: T[] = [];
+  for (let i = 0; i < limit; i++) {
+    sampled.push(rows[Math.floor((i * rows.length) / limit)] as T);
+  }
+  return sampled;
 }
 
 /**
- * Distinct / non-empty / blank counts over the first ~1000 rows. Used by the SS-9
- * detectors to reason about uniqueness (PK candidates) and join grain. Unlike
- * `collectSamples`, this scans every value in the window — uniqueness needs the full count,
- * not just the first 5 distinct samples.
+ * Case-insensitive tokens real exports use for missing data ("#N/A" is Excel's error literal,
+ * "nan" comes from pandas). Treating them as blank keeps the content-aware evidence honest: a
+ * column that is 30% "N/A" is not a primary-key candidate, and "NULL" is not a join value.
+ * Deliberately conservative — ambiguous strings that can be legitimate values ("NA" the country
+ * code, "none" the option) are NOT included.
+ */
+const NULL_TOKENS = new Set(["", "null", "n/a", "#n/a", "nan", "-", "--"]);
+
+/** Is this cell a real value, or empty/missing (including textual null tokens)? */
+export function isNullToken(value: string | null | undefined): boolean {
+  return value === null || value === undefined || NULL_TOKENS.has(value.trim().toLowerCase());
+}
+
+function isNonEmpty(value: string | null | undefined): value is string {
+  return !isNullToken(value);
+}
+
+/**
+ * Distinct / non-empty / blank counts over the scanned rows (up to MAX_SCAN_ROWS, sampled
+ * evenly across the file by the parsers via `sampleScanRows`). Used by the SS-9 detectors to
+ * reason about uniqueness (PK candidates) and join grain. Unlike `collectSamples`, this scans
+ * every value in the window — uniqueness needs the full count, not just the first 5 distinct
+ * samples.
  */
 export function collectStats(values: string[]): FieldStats {
   const distinctValues = new Set<string>();

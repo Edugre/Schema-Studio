@@ -10,6 +10,8 @@ export type {
   SuggestionRanking,
 } from "./ai/provider.js";
 export type {
+  CompositeKeyCandidate,
+  CompositeKeyOptions,
   DetectOptions,
   FieldRef,
   FormatIssue,
@@ -18,16 +20,30 @@ export type {
   JoinKeyCandidate,
   PrimaryKeyCandidate,
   PrimaryKeyOptions,
+  SemanticType,
+  SemanticTypeFinding,
+  SemanticTypeOptions,
+  ValueSetCandidate,
+  ValueSetOptions,
+  ValueSetSuggestion,
 } from "./detect/index.js";
 export {
+  detectCompositeKeys,
   detectFormatMismatch,
   detectJoinKeys,
   detectPrimaryKeys,
+  detectSemanticTypes,
+  detectValueSets,
   inferGrain,
 } from "./detect/index.js";
 export type { SqlDialect } from "./export/index.js";
 export { toDbml, toPrisma, toSql } from "./export/index.js";
-export type { TargetId, TargetProfile, TypeVocabularyEntry } from "./target/index.js";
+export type {
+  TargetExtension,
+  TargetId,
+  TargetProfile,
+  TypeVocabularyEntry,
+} from "./target/index.js";
 export {
   DEFAULT_TARGET,
   TARGET_PROFILES,
@@ -70,6 +86,8 @@ export {
   collectSamples,
   collectStats,
   inferType,
+  isNullToken,
+  sampleScanRows,
   parseCsv,
   parseJson,
   parseSource,

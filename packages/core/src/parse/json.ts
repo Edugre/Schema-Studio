@@ -1,7 +1,7 @@
 import { ParseError } from "./errors.js";
 import type { Source } from "./types.js";
 import { buildSourceField, dedupeNames, resolveMakeId, type ParseOptions } from "./util.js";
-import { MAX_SCAN_ROWS } from "./sample.js";
+import { MAX_ROW_TUPLES, sampleScanRows } from "./sample.js";
 
 const MAX_KEY_SCAN_RECORDS = 200;
 const MAX_FLATTEN_DEPTH = 2;
@@ -144,17 +144,20 @@ export function parseJson(input: string, name: string, opts?: ParseOptions): Sou
 
   const records = extractRecords(parsed);
 
-  const scanRecords = records.slice(0, MAX_SCAN_ROWS);
+  const scanRecords = sampleScanRows(records);
   const keyOrder = unionFieldKeys(scanRecords);
   const dedupedNames = dedupeNames(keyOrder);
+
+  // Flatten each record exactly once; both the per-column values and the row tuples
+  // below project from this pass (recursive flattening is the expensive part).
+  const flattenedRecords = scanRecords.map((record) => recordFieldValues(record));
 
   const columnValues = new Map<string, string[]>();
   for (const name of keyOrder) {
     columnValues.set(name, []);
   }
 
-  for (const record of scanRecords) {
-    const flattened = recordFieldValues(record);
+  for (const flattened of flattenedRecords) {
     for (const key of keyOrder) {
       const values = columnValues.get(key);
       if (!values) {
@@ -170,11 +173,16 @@ export function parseJson(input: string, name: string, opts?: ParseOptions): Sou
     return buildSourceField(values, fieldName);
   });
 
+  const sampleRows = sampleScanRows(flattenedRecords, MAX_ROW_TUPLES).map((flattened) =>
+    keyOrder.map((key) => flattened.get(key) ?? ""),
+  );
+
   return {
     id: resolveMakeId(opts)(),
     name,
     kind: "json",
     fields,
+    sampleRows,
     // Every extracted record is a row, uncapped — not limited to the scanned slice.
     rowCount: records.length,
   };

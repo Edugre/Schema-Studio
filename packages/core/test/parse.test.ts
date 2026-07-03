@@ -2,6 +2,7 @@ import * as XLSX from "xlsx";
 import { describe, expect, it } from "vitest";
 
 import {
+  MAX_SCAN_ROWS,
   TYPE_INFERENCE_RULES,
   TYPE_INFERENCE_THRESHOLD,
   ParseError,
@@ -12,6 +13,7 @@ import {
   parseJson,
   parseSource,
   parseXlsx,
+  sampleScanRows,
 } from "../src/parse/index.js";
 
 function makeTestIds(prefix = "test-id"): () => string {
@@ -26,6 +28,7 @@ describe("inferType", () => {
       "bool",
       "int",
       "numeric",
+      "timestamp",
       "date",
       "text",
     ]);
@@ -64,7 +67,21 @@ describe("inferType", () => {
     expect(inferType(["2024-01-15", "2024-02-20"])).toBe("date");
     expect(inferType(["2024/01/15", "2024/02/20"])).toBe("date");
     expect(inferType(["01/15/2024", "02/20/2024"])).toBe("date");
-    expect(inferType(["2024-01-15T10:30:00Z", "2024-02-20T08:00:00+00:00"])).toBe("date");
+  });
+
+  it("infers timestamp — not date — when values carry a time of day", () => {
+    expect(inferType(["2024-01-15T10:30:00Z", "2024-02-20T08:00:00+00:00"])).toBe("timestamp");
+    expect(inferType(["2024-01-15 10:30:00", "2024-02-20 08:00:00"])).toBe("timestamp");
+    expect(inferType(["2024-01-15T10:30", "2024-02-20T08:00"])).toBe("timestamp");
+    expect(inferType(["2024-01-15T10:30:00.123Z", "2024-02-20T08:00:00.456Z"])).toBe("timestamp");
+  });
+
+  it("ignores textual null tokens when inferring the type", () => {
+    // "NULL" among ints must not drag the column to text.
+    expect(inferType(["1", "2", "NULL", "3", "n/a"])).toBe("int");
+    expect(inferType(["2024-01-15", "#N/A", "2024-02-20"])).toBe("date");
+    // An all-null-token column has no evidence at all.
+    expect(inferType(["NULL", "N/A", "-", "--", "NaN"])).toBe("text");
   });
 
   it("falls back to text when fewer than 95% of values match", () => {
@@ -94,6 +111,137 @@ describe("collectSamples", () => {
 
   it("excludes empty cells", () => {
     expect(collectSamples(["", "alpha", "", "beta"])).toEqual(["alpha", "beta"]);
+  });
+
+  it("excludes textual null tokens (NULL, N/A, #N/A, NaN, dashes)", () => {
+    expect(collectSamples(["NULL", "alpha", "N/A", "#N/A", "beta", "NaN", "-", "--"])).toEqual([
+      "alpha",
+      "beta",
+    ]);
+  });
+});
+
+describe("sampleScanRows", () => {
+  it("returns the rows unchanged when they fit the limit", () => {
+    const rows = ["a", "b", "c"];
+    expect(sampleScanRows(rows, 5)).toBe(rows);
+  });
+
+  it("samples evenly across the file, preserving order, deterministically", () => {
+    const rows = Array.from({ length: 100 }, (_, index) => index);
+    const sampled = sampleScanRows(rows, 10);
+
+    // Every region of the file is represented, not just the head.
+    expect(sampled).toEqual([0, 10, 20, 30, 40, 50, 60, 70, 80, 90]);
+    expect(sampleScanRows(rows, 10)).toEqual(sampled);
+  });
+
+  it("de-biases a file sorted by the sampled column", () => {
+    // 3000 rows sorted by status: a head slice of 1000 would see only "alpha".
+    const rows = Array.from({ length: 3000 }, (_, index) =>
+      index < 1000 ? "alpha" : index < 2000 ? "beta" : "gamma",
+    );
+
+    expect(new Set(sampleScanRows(rows))).toEqual(new Set(["alpha", "beta", "gamma"]));
+  });
+});
+
+describe("scan-window sampling through parseCsv", () => {
+  it("captures values from the whole file, not just the first 1000 rows", () => {
+    const statuses = Array.from({ length: 2400 }, (_, index) =>
+      index < 800 ? "alpha" : index < 1600 ? "beta" : "gamma",
+    );
+    const input = ["id,status", ...statuses.map((status, index) => `${index},${status}`)].join(
+      "\n",
+    );
+
+    const source = parseCsv(input, "sorted.csv");
+    const status = source.fields.find((field) => field.name === "status");
+
+    expect(source.rowCount).toBe(2400);
+    // The scan window is still bounded…
+    expect(status?.stats?.nonEmpty).toBe(MAX_SCAN_ROWS);
+    // …but now sees every region of the sorted file.
+    expect(status?.stats?.distinct).toBe(3);
+    expect(status?.distinctValues).toEqual(["alpha", "beta", "gamma"]);
+  });
+});
+
+describe("sampleRows retention", () => {
+  it("captures field-aligned row tuples from CSV, capped at 200", () => {
+    const small = parseCsv("a,b\n1,x\n2,y", "small.csv");
+    expect(small.sampleRows).toEqual([
+      ["1", "x"],
+      ["2", "y"],
+    ]);
+
+    const bigInput = [
+      "id,status",
+      ...Array.from({ length: 2400 }, (_, i) => `${i},s${i % 3}`),
+    ].join("\n");
+    const big = parseCsv(bigInput, "big.csv");
+    expect(big.sampleRows).toHaveLength(200);
+    // Tuples stay aligned: each row's id and status came from the same source line.
+    for (const row of big.sampleRows ?? []) {
+      expect(`s${Number(row[0]) % 3}`).toBe(row[1]);
+    }
+  });
+
+  it("captures row tuples from JSON records", () => {
+    const source = parseJson('[{"a":1,"b":"x"},{"a":2,"b":"y"}]', "r.json");
+    expect(source.sampleRows).toEqual([
+      ["1", "x"],
+      ["2", "y"],
+    ]);
+  });
+
+  it("captures tuples for a single-sheet workbook but not multi-sheet", () => {
+    const single = parseSource({
+      name: "single.xlsx",
+      kind: "xlsx",
+      content: workbookBufferFor({
+        Only: [
+          ["id", "name"],
+          ["1", "Ada"],
+        ],
+      }),
+    });
+    expect(single.sampleRows).toEqual([["1", "Ada"]]);
+
+    const multi = parseSource({
+      name: "multi.xlsx",
+      kind: "xlsx",
+      content: workbookBufferFor({
+        People: [["id"], ["1"]],
+        Places: [["city"], ["Paris"]],
+      }),
+    });
+    // Columns come from different sheets — no single row matrix exists.
+    expect(multi.sampleRows).toBeUndefined();
+  });
+});
+
+/** Standalone workbook builder for tests outside the parseXlsx describe block. */
+function workbookBufferFor(sheets: Record<string, string[][]>): ArrayBuffer {
+  const workbook = XLSX.utils.book_new();
+  for (const [sheetName, rows] of Object.entries(sheets)) {
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(rows), sheetName);
+  }
+  return XLSX.write(workbook, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+}
+
+describe("null-token handling in stats", () => {
+  it("counts null tokens as blank, disqualifying fake primary keys", () => {
+    // Distinct real values, but a third of the column is "N/A" — not PK material.
+    const stats = collectStats(["a", "b", "N/A", "c", "NULL", "d"]);
+
+    expect(stats).toEqual({ nonEmpty: 4, distinct: 4, blank: 2 });
+  });
+
+  it("recognizes tokens case-insensitively and with padding", () => {
+    const stats = collectStats([" null ", "Null", "x", " n/a"]);
+
+    expect(stats).toEqual({ nonEmpty: 1, distinct: 1, blank: 3 });
   });
 });
 

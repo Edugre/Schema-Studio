@@ -5,6 +5,9 @@ import {
   detectFormatMismatch,
   detectJoinKeys,
   detectPrimaryKeys,
+  detectCompositeKeys,
+  detectSemanticTypes,
+  detectValueSets,
   inferGrain,
 } from "../src/detect/index.js";
 
@@ -240,5 +243,273 @@ describe("detectPrimaryKeys", () => {
 
     const candidates = detectPrimaryKeys([source1]);
     expect(candidates.map((c) => c.field)).toEqual(["user_id", "title"]);
+  });
+});
+
+describe("detectValueSets", () => {
+  /** A field whose distinct value set is fully captured, as parse would produce. */
+  function enumField(
+    name: string,
+    type: SourceField["type"],
+    distinctValues: string[],
+    nonEmpty: number,
+  ): SourceField {
+    return {
+      name,
+      type,
+      samples: distinctValues.slice(0, 5),
+      distinctValues,
+      stats: { nonEmpty, distinct: distinctValues.length, blank: 0 },
+    };
+  }
+
+  it("detects a repeating status column as a closed value set", () => {
+    const src = source("s1", "orders.csv", [
+      enumField("status", "text", ["shipped", "pending", "cancelled"], 200),
+    ]);
+
+    const candidates = detectValueSets([src]);
+
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0]).toMatchObject({
+      sourceName: "orders.csv",
+      field: "status",
+      distinct: 3,
+      nonEmpty: 200,
+      suggestion: "enum",
+    });
+    expect(candidates[0]?.values).toEqual(["cancelled", "pending", "shipped"]);
+  });
+
+  it("suggests lookup for descriptive name-like values", () => {
+    const src = source("s1", "orders.csv", [
+      enumField(
+        "shipping_method",
+        "text",
+        ["Standard Ground Shipping", "Express Overnight Delivery", "In-Store Pickup"],
+        150,
+      ),
+    ]);
+
+    expect(detectValueSets([src])[0]?.suggestion).toBe("lookup");
+  });
+
+  it("ignores high-cardinality columns, booleans, and columns without repeats", () => {
+    const src = source("s1", "orders.csv", [
+      // Unique identifier: distinct === nonEmpty, ratio 1.
+      enumField("order_id", "text", ["a", "b", "c", "d", "e", "f"], 6),
+      // Boolean columns are already modeled by their type.
+      enumField("is_paid", "bool", ["true", "false"], 100),
+    ]);
+
+    expect(detectValueSets([src])).toEqual([]);
+  });
+
+  it("skips fields without stats or with too few rows", () => {
+    const src = source("s1", "orders.csv", [
+      field("status", "text", ["a", "b"]),
+      enumField("tiny", "text", ["x"], 2),
+    ]);
+
+    expect(detectValueSets([src])).toEqual([]);
+  });
+});
+
+describe("detectSemanticTypes", () => {
+  function valuesField(
+    name: string,
+    type: SourceField["type"],
+    distinctValues: string[],
+  ): SourceField {
+    return { name, type, samples: distinctValues.slice(0, 5), distinctValues };
+  }
+
+  it("detects emails, urls, and uuids from values alone", () => {
+    const src = source("s1", "users.csv", [
+      valuesField("contact", "text", ["a@x.com", "b@y.org", "c@z.net"]),
+      valuesField("website", "text", ["https://a.com", "http://b.org", "https://c.io/x"]),
+      valuesField("token", "text", [
+        "6fa459ea-ee8a-3ca4-894e-db77e160355e",
+        "16fd2706-8baf-433b-82eb-8c7fada847da",
+        "886313e1-3b8a-5372-9b90-0c9aee199e5d",
+      ]),
+    ]);
+
+    const semantics = detectSemanticTypes([src]).map((finding) => [
+      finding.field,
+      finding.semantic,
+    ]);
+
+    expect(semantics).toEqual([
+      ["contact", "email"],
+      ["token", "uuid"],
+      ["website", "url"],
+    ]);
+  });
+
+  it("detects latitude/longitude pairs only with a corroborating name", () => {
+    const src = source("s1", "stores.csv", [
+      valuesField("latitude", "numeric", ["40.7128", "34.0522", "-33.8688"]),
+      valuesField("lng", "numeric", ["-74.0060", "-118.2437", "151.2093"]),
+      // Same value shapes but a neutral name — must NOT classify.
+      valuesField("score", "numeric", ["40.7", "34.0", "-33.8"]),
+    ]);
+
+    const findings = detectSemanticTypes([src]);
+
+    expect(findings).toEqual([
+      expect.objectContaining({ field: "latitude", semantic: "latitude" }),
+      expect.objectContaining({ field: "lng", semantic: "longitude" }),
+    ]);
+  });
+
+  it("requires a name hint for zips and phones so plain ids stay unclassified", () => {
+    const src = source("s1", "orgs.csv", [
+      valuesField("zip_code", "text", ["07030", "10001", "94103"]),
+      valuesField("org_id", "text", ["07031", "10002", "94104"]),
+      valuesField("phone", "text", ["(212) 555-0100", "+1 415-555-0101", "646.555.0102"]),
+    ]);
+
+    const semantics = detectSemanticTypes([src]).map((finding) => [
+      finding.field,
+      finding.semantic,
+    ]);
+
+    expect(semantics).toEqual([
+      ["phone", "phone"],
+      ["zip_code", "postal_code"],
+    ]);
+  });
+
+  it("stays quiet below the match-rate or value-count thresholds", () => {
+    const src = source("s1", "misc.csv", [
+      // Only 2 of 4 values are emails — below the 0.9 match rate.
+      valuesField("notes", "text", ["a@x.com", "call later", "b@y.org", "n/a"]),
+      // Too few values to judge.
+      valuesField("maybe_email", "text", ["a@x.com", "b@y.org"]),
+    ]);
+
+    expect(detectSemanticTypes([src])).toEqual([]);
+  });
+});
+
+describe("detectCompositeKeys", () => {
+  /** Build a source whose fields and stats are derived from explicit row tuples. */
+  function tupleSource(name: string, fieldNames: string[], rows: string[][]): Source {
+    const fields = fieldNames.map((fieldName, index) => {
+      const values = rows.map((row) => row[index] ?? "");
+      const distinct = new Set(values.filter((value) => value !== "")).size;
+      const nonEmpty = values.filter((value) => value !== "").length;
+      return {
+        name: fieldName,
+        type: "text" as const,
+        samples: values.slice(0, 5),
+        stats: { nonEmpty, distinct, blank: values.length - nonEmpty },
+      };
+    });
+    return { id: name, name, kind: "csv", fields, sampleRows: rows };
+  }
+
+  /** 8 orders × 3 line numbers: the classic line-item grain. */
+  function orderLineRows(): string[][] {
+    const rows: string[][] = [];
+    for (let order = 1; order <= 8; order += 1) {
+      for (let line = 1; line <= 3; line += 1) {
+        // amount repeats within an order so (order_id, amount) is NOT unique together.
+        rows.push([`O${order}`, String(line), line === 2 ? "20.00" : "10.00"]);
+      }
+    }
+    return rows;
+  }
+
+  it("finds the pair that is unique together while neither is unique alone", () => {
+    const source = tupleSource(
+      "order_lines.csv",
+      ["order_id", "line_no", "amount"],
+      orderLineRows(),
+    );
+
+    const candidates = detectCompositeKeys([source]);
+
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0]).toMatchObject({
+      sourceName: "order_lines.csv",
+      fields: ["order_id", "line_no"],
+      rows: 24,
+    });
+    expect(candidates[0]?.reason).toContain("unique together");
+  });
+
+  it("excludes columns that are unique alone — a single-column PK suffices", () => {
+    const rows = Array.from({ length: 24 }, (_, index) => [
+      `row-${index}`, // unique alone
+      String(index % 3),
+      String(index % 8),
+    ]);
+    const source = tupleSource("t.csv", ["id", "a", "b"], rows);
+
+    // (a, b) covers only 24 of 24 combos? 3×8 = 24 distinct pairs here — that IS unique
+    // together, and neither a nor b is unique alone, so it's the only legitimate candidate;
+    // nothing may pair with the standalone-unique id column.
+    const candidates = detectCompositeKeys([source]);
+    expect(candidates.every((candidate) => !candidate.fields.includes("id"))).toBe(true);
+  });
+
+  it("rejects a nearly-unique column even when its duplicates miss the tuple sample", () => {
+    // email has ONE duplicate in the full 1000-row window (stats say duplicated) but is
+    // fully unique within the 30 sampled tuples. Judging eligibility on the full window
+    // alone would let (email, country) read as "unique together" — a spurious composite
+    // key for what is effectively a single-column key.
+    const rows = Array.from({ length: 30 }, (_, index) => [
+      `user${index}@x.com`,
+      index % 2 === 0 ? "US" : "CA",
+    ]);
+    const source: Source = {
+      id: "s1",
+      name: "users.csv",
+      kind: "csv",
+      fields: [
+        {
+          name: "email",
+          type: "text",
+          samples: ["user0@x.com"],
+          stats: { nonEmpty: 1000, distinct: 999, blank: 0 },
+        },
+        {
+          name: "country",
+          type: "text",
+          samples: ["US", "CA"],
+          stats: { nonEmpty: 1000, distinct: 2, blank: 0 },
+        },
+      ],
+      sampleRows: rows,
+    };
+
+    expect(detectCompositeKeys([source])).toEqual([]);
+  });
+
+  it("excludes columns containing null tokens — keys must be non-null", () => {
+    const rows = orderLineRows();
+    const withNull = rows.map((row, index) =>
+      index === 5 ? ["N/A", row[1] ?? "", row[2] ?? ""] : row,
+    );
+    const source = tupleSource("order_lines.csv", ["order_id", "line_no", "amount"], withNull);
+
+    expect(
+      detectCompositeKeys([source]).some((candidate) => candidate.fields.includes("order_id")),
+    ).toBe(false);
+  });
+
+  it("yields nothing without sampleRows or below the row threshold", () => {
+    const noTuples = tupleSource("a.csv", ["x", "y"], orderLineRows());
+    delete (noTuples as { sampleRows?: string[][] }).sampleRows;
+    expect(detectCompositeKeys([noTuples])).toEqual([]);
+
+    const tiny = tupleSource(
+      "b.csv",
+      ["order_id", "line_no", "amount"],
+      orderLineRows().slice(0, 6),
+    );
+    expect(detectCompositeKeys([tiny])).toEqual([]);
   });
 });
