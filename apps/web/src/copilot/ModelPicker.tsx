@@ -3,20 +3,24 @@ import { useEffect, useRef, useState } from "react";
 import { setModelPreference, useModelPreference } from "../ai/modelPreference.js";
 import { useProviderPreference } from "../ai/providerPreference.js";
 import { PROVIDERS, PROVIDER_IDS, type ProviderId } from "../ai/providers.js";
+import { useAllModels } from "../ai/useModels.js";
 import { useApiKeyContext } from "./ApiKeyContext.js";
 import { CheckIcon, ChevronDownIcon, LockIcon, ServerIcon } from "../ui/icons.js";
 import "./ModelPicker.css";
 
 /**
- * A compact, Cursor-style model selector for the chat composer. Lists the top models of every
- * provider plus a Local option. A model whose provider has no saved key is shown disabled (and
- * cannot be selected); Local is always disabled until a local runtime exists. Picking a model both
- * sets that provider's model and makes the provider active, so the copilot switches immediately.
+ * A compact, Cursor-style model selector for the chat composer. Lists each provider's models plus a
+ * Local option. The model set comes from {@link useAllModels} — the same live+catalog source the
+ * Settings dropdown uses — so it surfaces the models a key can actually access and stays in sync
+ * rather than drifting from a hand-maintained shortlist. A model whose provider has no saved key is
+ * shown disabled; Local is always disabled until a local runtime exists. Picking a model both sets
+ * that provider's model and makes the provider active, so the copilot switches immediately.
  */
 export function ModelPicker({ onConnect }: { onConnect?: () => void }) {
   const { provider, setProvider } = useProviderPreference();
   const { model } = useModelPreference(provider);
   const { keyFor } = useApiKeyContext();
+  const { models } = useAllModels();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -45,11 +49,8 @@ export function ModelPicker({ onConnect }: { onConnect?: () => void }) {
 
   const hasKey = (id: ProviderId) => keyFor(id).apiKey.trim().length > 0;
 
-  // Label for the current selection, from the active provider's shortlist (or the raw id).
-  const currentMeta = PROVIDERS[provider];
-  const currentModel =
-    currentMeta.featured.find((entry) => entry.id === model) ??
-    currentMeta.catalog.find((entry) => entry.id === model);
+  // Label for the current selection, from the resolved model list (or the raw id as a fallback).
+  const currentModel = models.find((entry) => entry.provider === provider && entry.id === model);
   const currentLabel = currentModel?.displayName ?? model;
 
   const select = (providerId: ProviderId, id: string) => {
@@ -77,6 +78,10 @@ export function ModelPicker({ onConnect }: { onConnect?: () => void }) {
           {PROVIDER_IDS.map((id) => {
             const meta = PROVIDERS[id];
             const enabled = hasKey(id);
+            const options = models.filter((entry) => entry.provider === id);
+            if (options.length === 0) {
+              return null;
+            }
             return (
               <div className="model-picker__group" key={id}>
                 <div className="model-picker__group-head">
@@ -95,7 +100,7 @@ export function ModelPicker({ onConnect }: { onConnect?: () => void }) {
                     </button>
                   ) : null}
                 </div>
-                {meta.featured.map((entry) => {
+                {options.map((entry) => {
                   const isActive = id === provider && entry.id === model;
                   return (
                     <button

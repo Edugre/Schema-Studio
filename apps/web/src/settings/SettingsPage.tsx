@@ -125,6 +125,10 @@ function ApiKeysSection({ onAddKey }: { onAddKey: () => void }) {
   // Every provider that has a key, in registry order — the unified key list.
   const configured = PROVIDER_IDS.filter((id) => keyFor(id).apiKey.trim().length > 0);
   const anyKey = configured.length > 0;
+  // Rerank + auto-draft run through the ACTIVE provider (useAiProvider), so they need the active
+  // provider's key specifically — not just any key. Gating on `anyKey` would enable them while the
+  // active provider is keyless (e.g. after removing its key), where they silently no-op.
+  const activeHasKey = keyFor(provider).apiKey.trim().length > 0;
 
   // The dropdown value uniquely identifies a (provider, model) pair — ids don't collide across
   // providers today, but a composite value keeps the mapping back to a provider unambiguous.
@@ -318,7 +322,7 @@ function ApiKeysSection({ onAddKey }: { onAddKey: () => void }) {
         <input
           type="checkbox"
           checked={rerank}
-          disabled={!anyKey}
+          disabled={!activeHasKey}
           onChange={(event) => setRerank(event.target.checked)}
         />
         Use AI to reorder and explain content-aware suggestions (makes a billable call to your
@@ -331,7 +335,7 @@ function ApiKeysSection({ onAddKey }: { onAddKey: () => void }) {
         <input
           type="checkbox"
           checked={autoDraft}
-          disabled={!anyKey}
+          disabled={!activeHasKey}
           onChange={(event) => setAutoDraft(event.target.checked)}
         />
         When you create a project, have AI draft an initial schema from your files and description

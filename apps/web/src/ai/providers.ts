@@ -26,8 +26,6 @@ export type ProviderMeta = {
   defaultModel: string;
   /** Static fallback catalog for the model picker when the live list can't be fetched. */
   catalog: ModelInfo[];
-  /** The top models to surface in the compact chat model picker (a curated shortlist). */
-  featured: ModelInfo[];
   create(apiKey: string, model: string, target: TargetId): AiProvider;
 };
 
@@ -40,10 +38,6 @@ export const PROVIDERS: Record<ProviderId, ProviderMeta> = {
     keysUrl: "https://console.anthropic.com/settings/keys",
     defaultModel: DEFAULT_MODEL,
     catalog: MODEL_CATALOG,
-    featured: [
-      { id: "claude-opus-4-8", displayName: "Claude Opus 4.8" },
-      { id: "claude-sonnet-4-6", displayName: "Claude Sonnet 4.6" },
-    ],
     create: (apiKey, model, target) => new AnthropicBrowserProvider(apiKey, model, target),
   },
   openai: {
@@ -54,11 +48,6 @@ export const PROVIDERS: Record<ProviderId, ProviderMeta> = {
     keysUrl: "https://platform.openai.com/api-keys",
     defaultModel: OPENAI_DEFAULT_MODEL,
     catalog: OPENAI_MODEL_CATALOG,
-    featured: [
-      { id: "gpt-5", displayName: "GPT-5" },
-      { id: "gpt-4.1", displayName: "GPT-4.1" },
-      { id: "o3", displayName: "o3" },
-    ],
     create: (apiKey, model, target) => new OpenAiBrowserProvider(apiKey, model, target),
   },
 };
