@@ -22,9 +22,10 @@ describe("toProviderId", () => {
 });
 
 describe("local provider registry entry", () => {
-  it("is an endpoint-credentialed provider with a default endpoint and empty catalog", () => {
+  it("is a non-secret endpoint credential with a default endpoint and empty catalog", () => {
     const meta = PROVIDERS.local;
-    expect(meta.credentialKind).toBe("endpoint");
+    expect(meta.credential.secret).toBe(false);
+    expect(meta.credential.label).toBe("Server URL");
     expect(meta.defaultCredential).toBe("http://localhost:11434/v1");
     expect(meta.catalog).toEqual([]);
     // No default model — the copilot must never post an empty model id; a concrete model has to be
@@ -35,6 +36,25 @@ describe("local provider registry entry", () => {
   it("builds a LocalBrowserProvider from its factory", () => {
     const provider = PROVIDERS.local.create("http://localhost:1234/v1", "llama3.1", DEFAULT_TARGET);
     expect(provider).toBeInstanceOf(LocalBrowserProvider);
+  });
+});
+
+describe("credential validation", () => {
+  it("rejects malformed URLs for the local endpoint and accepts real http(s) URLs", () => {
+    const validate = PROVIDERS.local.credential.validate;
+    expect(validate("http://localhost:11434/v1")).toBeNull();
+    expect(validate("https://gpu.lan:8000/v1")).toBeNull();
+    // The old keyPrefix('http') check accepted all of these; the URL validator rejects them.
+    expect(validate("httpfoo")).not.toBeNull();
+    expect(validate("http")).not.toBeNull();
+    expect(validate("ftp://host/v1")).not.toBeNull();
+  });
+
+  it("checks the key prefix for cloud providers", () => {
+    expect(PROVIDERS.anthropic.credential.validate("sk-ant-abc")).toBeNull();
+    expect(PROVIDERS.anthropic.credential.validate("nope")).not.toBeNull();
+    expect(PROVIDERS.openai.credential.validate("sk-abc")).toBeNull();
+    expect(PROVIDERS.openai.credential.validate("nope")).not.toBeNull();
   });
 });
 

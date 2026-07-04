@@ -17,16 +17,14 @@ import {
 import "./ByoKeyPage.css";
 
 // Every provider comes from the registry now — including local, whose credential is a server URL
-// rather than a secret key (see `credentialKind`).
+// rather than a secret key (see `ProviderMeta.credential`).
 const SEGMENTS = PROVIDER_IDS.map((id) => ({ id, label: PROVIDERS[id].label }));
 
-/** The value to seed the field with for a provider: its stored credential, or local's default URL. */
+/** The value to seed the field with for a provider: its stored credential, or its default (local). */
 function seedCredential(stored: string, meta: (typeof PROVIDERS)[ProviderId]): string {
-  if (stored.trim()) {
-    return stored;
-  }
-  // Endpoint providers (local) prefill their default so the field is usable out of the box.
-  return meta.credentialKind === "endpoint" ? (meta.defaultCredential ?? "") : "";
+  // Untrimmed `stored` is returned as-is so we never clobber what the user is typing; only the
+  // empty case falls back to the provider default (which only local has).
+  return stored.trim() ? stored : (meta.defaultCredential ?? "");
 }
 
 export function ByoKeyPage({ onClose }: { onClose: () => void }) {
@@ -34,7 +32,7 @@ export function ByoKeyPage({ onClose }: { onClose: () => void }) {
   const { provider: activeProvider, setProvider } = useProviderPreference();
   const [selected, setSelected] = useState<ProviderId>(activeProvider);
   const meta = PROVIDERS[selected];
-  const isEndpoint = meta.credentialKind === "endpoint";
+  const credential = meta.credential;
   const storedKey = keyFor(selected).apiKey;
   const { remember } = keyFor(selected);
   const [draft, setDraft] = useState(() => seedCredential(storedKey, meta));
@@ -60,12 +58,9 @@ export function ByoKeyPage({ onClose }: { onClose: () => void }) {
     if (!trimmed) {
       return;
     }
-    if (!trimmed.startsWith(meta.keyPrefix)) {
-      setError(
-        isEndpoint
-          ? "That doesn't look like a server URL — it should start with “http”."
-          : `That doesn't look like a ${meta.label} key — it should start with “${meta.keyPrefix}”.`,
-      );
+    const invalid = credential.validate(trimmed);
+    if (invalid) {
+      setError(invalid);
       return;
     }
     setError(null);
@@ -120,26 +115,26 @@ export function ByoKeyPage({ onClose }: { onClose: () => void }) {
             </div>
 
             <div className="byok__key-row">
-              <span className="byok__label">{isEndpoint ? "Server URL" : "API key"}</span>
+              <span className="byok__label">{credential.label}</span>
               <a
                 className="byok__link"
                 href={meta.keysUrl}
                 target="_blank"
                 rel="noreferrer noopener"
               >
-                {isEndpoint ? "Set up a local model" : "Where do I find my key?"}
+                {credential.linkLabel}
               </a>
             </div>
 
             <div className={`byok__input${error ? " is-invalid" : ""}`}>
-              {isEndpoint ? (
-                <ServerIcon size={16} className="byok__input-icon" />
-              ) : (
+              {credential.secret ? (
                 <KeyIcon size={16} className="byok__input-icon" />
+              ) : (
+                <ServerIcon size={16} className="byok__input-icon" />
               )}
               <input
-                // A server URL isn't a secret, so it stays visible; keys are masked until revealed.
-                type={isEndpoint || revealed ? "text" : "password"}
+                // A non-secret value (URL) stays visible; secrets are masked until revealed.
+                type={!credential.secret || revealed ? "text" : "password"}
                 className="byok__input-field"
                 placeholder={meta.keyPlaceholder}
                 value={draft}
@@ -157,7 +152,7 @@ export function ByoKeyPage({ onClose }: { onClose: () => void }) {
                   }
                 }}
               />
-              {isEndpoint ? null : (
+              {credential.secret ? (
                 <button
                   type="button"
                   className="byok__reveal"
@@ -167,23 +162,14 @@ export function ByoKeyPage({ onClose }: { onClose: () => void }) {
                 >
                   {revealed ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
                 </button>
-              )}
+              ) : null}
             </div>
 
-            {error ? (
-              <p className="byok__helper byok__helper--error">{error}</p>
-            ) : isEndpoint ? (
-              <p className="byok__helper">
-                Point this at any OpenAI-compatible local runtime (Ollama, LM Studio, llama.cpp).
-                The model must support tool calling — e.g. Llama 3.1, Qwen2.5, Mistral.
-              </p>
-            ) : (
-              <p className="byok__helper">
-                Used directly from this browser to call the provider — never sent to our servers.
-              </p>
-            )}
+            <p className={`byok__helper${error ? " byok__helper--error" : ""}`}>
+              {error ?? credential.help}
+            </p>
 
-            {isEndpoint ? (
+            {credential.secret ? null : (
               <div className="byok__trust">
                 <InfoIcon size={16} />
                 <span>
@@ -192,7 +178,7 @@ export function ByoKeyPage({ onClose }: { onClose: () => void }) {
                   allows it by default).
                 </span>
               </div>
-            ) : null}
+            )}
 
             <label className="byok__remember">
               <input
@@ -200,16 +186,16 @@ export function ByoKeyPage({ onClose }: { onClose: () => void }) {
                 checked={remember}
                 onChange={(event) => setRemember(selected, event.target.checked)}
               />
-              Remember this {isEndpoint ? "endpoint" : "key"} on this device
+              Remember this {credential.noun} on this device
             </label>
 
             <div className="byok__trust">
               <InfoIcon size={16} />
               <span>
-                Your {isEndpoint ? "endpoint" : "key"} is stored{" "}
+                Your {credential.noun} is stored{" "}
                 {remember ? "locally in this browser" : "in memory for this session"} and used to
-                call the {isEndpoint ? "server" : "provider"} directly. It never passes through
-                Schema Studio&apos;s servers — files are parsed locally too.
+                call the {credential.secret ? "provider" : "server"} directly. It never passes
+                through Schema Studio&apos;s servers — files are parsed locally too.
               </span>
             </div>
           </div>

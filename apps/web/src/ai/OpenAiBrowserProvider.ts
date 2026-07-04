@@ -35,6 +35,7 @@ export class OpenAiBrowserProvider extends OpenAiCompatibleProvider {
   ) {
     super(
       {
+        errorLabel: "OpenAI",
         chatUrl: OPENAI_API_URL,
         modelsUrl: OPENAI_MODELS_URL,
         model,

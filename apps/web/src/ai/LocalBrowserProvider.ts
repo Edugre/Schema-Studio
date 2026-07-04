@@ -56,6 +56,7 @@ export class LocalBrowserProvider extends OpenAiCompatibleProvider {
     const base = normalizeEndpoint(endpoint || LOCAL_DEFAULT_ENDPOINT);
     super(
       {
+        errorLabel: "Local",
         chatUrl: `${base}/chat/completions`,
         modelsUrl: `${base}/models`,
         model,

@@ -11,24 +11,36 @@ import { OPENAI_DEFAULT_MODEL, OPENAI_MODEL_CATALOG } from "./openaiModels.js";
 export type ProviderId = "anthropic" | "openai" | "local";
 
 /**
- * Whether a provider is credentialed by a secret API key or by a server URL. The BYO-key page keys
- * its input treatment (label, masking, validation) off this, so `"local"` gets a plain URL field
- * instead of a masked key field.
+ * How a provider's credential is presented and validated in the UI. Bundling these onto the meta
+ * (instead of branching on a `credentialKind` enum at every render site) keeps all the per-provider
+ * copy/behavior in one place: a new credential shape adds one entry here, not a new arm in every
+ * `isEndpoint ? … : …` ternary across the BYO-key page, model picker, and settings.
  */
-export type CredentialKind = "key" | "endpoint";
+export type CredentialMeta = {
+  /** Field label, e.g. "API key" / "Server URL". */
+  label: string;
+  /** Short noun for prose, e.g. "key" / "endpoint" ("Remember this {noun}"). */
+  noun: string;
+  /** Helper text shown under the input. */
+  help: string;
+  /** Text for the "where do I get this" link. */
+  linkLabel: string;
+  /** True for a secret (masked, with a reveal toggle); false for a plain value like a URL. */
+  secret: boolean;
+  /** Soft-validate the entered value; return an error message, or null when it looks valid. */
+  validate: (input: string) => string | null;
+};
 
 /**
  * Everything the app needs to know about one provider, so no consumer hardcodes Anthropic:
- * display copy, the credential shape + soft-validation prefix, the console URL, the picker's
- * default model + static fallback catalog, and a factory that builds the concrete {@link AiProvider}.
+ * display copy, the credential presentation/validation, the console URL, the picker's default model
+ * + static fallback catalog, and a factory that builds the concrete {@link AiProvider}.
  */
 export type ProviderMeta = {
   id: ProviderId;
   label: string;
-  /** Whether the provider's credential is a secret key or a server URL. */
-  credentialKind: CredentialKind;
-  /** Soft-validation prefix for the credential input (e.g. "sk-ant-", or "http" for an endpoint). */
-  keyPrefix: string;
+  /** How the credential input is labelled, masked, and validated. */
+  credential: CredentialMeta;
   keyPlaceholder: string;
   keysUrl: string;
   /**
@@ -49,12 +61,39 @@ export type ProviderMeta = {
   create(credential: string, model: string, target: TargetId): AiProvider;
 };
 
+/** A key-prefix validator: accepts values starting with `prefix`, else explains what's expected. */
+function expectPrefix(prefix: string, label: string): (input: string) => string | null {
+  return (input) =>
+    input.startsWith(prefix)
+      ? null
+      : `That doesn't look like ${label} — it should start with “${prefix}”.`;
+}
+
+/** A URL validator for endpoint credentials: must parse as an http(s) URL. */
+function expectHttpUrl(input: string): string | null {
+  let url: URL;
+  try {
+    url = new URL(input);
+  } catch {
+    return "Enter a valid server URL, e.g. http://localhost:11434/v1.";
+  }
+  return url.protocol === "http:" || url.protocol === "https:"
+    ? null
+    : "The server URL must start with http:// or https://.";
+}
+
 export const PROVIDERS: Record<ProviderId, ProviderMeta> = {
   anthropic: {
     id: "anthropic",
     label: "Anthropic",
-    credentialKind: "key",
-    keyPrefix: "sk-ant-",
+    credential: {
+      label: "API key",
+      noun: "key",
+      help: "Used directly from this browser to call the provider — never sent to our servers.",
+      linkLabel: "Where do I find my key?",
+      secret: true,
+      validate: expectPrefix("sk-ant-", "an Anthropic key"),
+    },
     keyPlaceholder: "sk-ant-api03-…",
     keysUrl: "https://console.anthropic.com/settings/keys",
     defaultModel: DEFAULT_MODEL,
@@ -64,8 +103,14 @@ export const PROVIDERS: Record<ProviderId, ProviderMeta> = {
   openai: {
     id: "openai",
     label: "OpenAI",
-    credentialKind: "key",
-    keyPrefix: "sk-",
+    credential: {
+      label: "API key",
+      noun: "key",
+      help: "Used directly from this browser to call the provider — never sent to our servers.",
+      linkLabel: "Where do I find my key?",
+      secret: true,
+      validate: expectPrefix("sk-", "an OpenAI key"),
+    },
     keyPlaceholder: "sk-…",
     keysUrl: "https://platform.openai.com/api-keys",
     defaultModel: OPENAI_DEFAULT_MODEL,
@@ -75,8 +120,14 @@ export const PROVIDERS: Record<ProviderId, ProviderMeta> = {
   local: {
     id: "local",
     label: "Local",
-    credentialKind: "endpoint",
-    keyPrefix: "http",
+    credential: {
+      label: "Server URL",
+      noun: "endpoint",
+      help: "Point this at any OpenAI-compatible local runtime (Ollama, LM Studio, llama.cpp). The model must support tool calling — e.g. Llama 3.1, Qwen2.5, Mistral.",
+      linkLabel: "Set up a local model",
+      secret: false,
+      validate: expectHttpUrl,
+    },
     keyPlaceholder: LOCAL_DEFAULT_ENDPOINT,
     keysUrl: "https://ollama.com/download",
     // No default model: the set depends on what the running server serves, so local isn't

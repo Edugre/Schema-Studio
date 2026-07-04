@@ -53,6 +53,8 @@ type OpenAiChatResponse = {
  * shared.
  */
 export type OpenAiCompatibleConfig = {
+  /** Human label for this provider, prefixed onto thrown errors so failures are attributable. */
+  errorLabel: string;
   /** Chat Completions endpoint, e.g. `https://api.openai.com/v1/chat/completions`. */
   chatUrl: string;
   /** Models list endpoint, e.g. `https://api.openai.com/v1/models`. */
@@ -244,7 +246,9 @@ export class OpenAiCompatibleProvider implements AiProvider {
     });
     if (!response.ok) {
       const errorBody = await response.text();
-      throw new Error(`Models API error (${response.status}): ${errorBody}`);
+      throw new Error(
+        `${this.config.errorLabel} Models API error (${response.status}): ${errorBody}`,
+      );
     }
     return this.config.parseModels(await response.json());
   }
@@ -281,7 +285,7 @@ export class OpenAiCompatibleProvider implements AiProvider {
 
     if (!response.ok) {
       const errorBody = await response.text();
-      throw new Error(`API error (${response.status}): ${errorBody}`);
+      throw new Error(`${this.config.errorLabel} API error (${response.status}): ${errorBody}`);
     }
 
     return (await response.json()) as OpenAiChatResponse;

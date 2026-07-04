@@ -82,11 +82,11 @@ export function ModelPicker({ onConnect }: { onConnect?: () => void }) {
             const meta = PROVIDERS[id];
             const ready = isReady(id);
             const options = models.filter((entry) => entry.provider === id);
-            const isEndpoint = meta.credentialKind === "endpoint";
-            // Key providers always carry a static catalog, so `options` is non-empty and the group
-            // renders. An endpoint provider (local) has no catalog, so it may have zero options —
+            // Providers with a static catalog always have options and render normally. A provider
+            // that discovers its models live (empty catalog, e.g. local) may have zero options —
             // still render it with an empty-state hint rather than hiding it entirely.
-            if (options.length === 0 && !isEndpoint) {
+            const discoversLive = meta.catalog.length === 0;
+            if (options.length === 0 && !discoversLive) {
               return null;
             }
             return (
@@ -107,7 +107,7 @@ export function ModelPicker({ onConnect }: { onConnect?: () => void }) {
                     </button>
                   ) : null}
                 </div>
-                {options.length === 0 && isEndpoint ? (
+                {options.length === 0 ? (
                   <p className="model-picker__empty">
                     No models found — start your local server and pull a model.
                   </p>

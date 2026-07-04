@@ -191,8 +191,8 @@ function ApiKeysSection({ onAddKey }: { onAddKey: () => void }) {
           {configured.map((id) => {
             const state = keyFor(id);
             const isActive = id === provider;
-            // A local endpoint is a URL, not a secret — show it in full; keys stay masked.
-            const isEndpoint = PROVIDERS[id].credentialKind === "endpoint";
+            // A non-secret credential (a local endpoint URL) is shown in full; secrets stay masked.
+            const { secret, noun } = PROVIDERS[id].credential;
             return (
               <div className="settings__key-card" key={id}>
                 <div className="settings__key-row">
@@ -210,7 +210,7 @@ function ApiKeysSection({ onAddKey }: { onAddKey: () => void }) {
                       ) : null}
                     </div>
                     <div className="settings__key-value">
-                      {isEndpoint ? state.apiKey : maskKey(state.apiKey)}
+                      {secret ? maskKey(state.apiKey) : state.apiKey}
                     </div>
                     <div className="settings__key-meta">
                       {state.remember ? "Saved on this device" : "In memory · this session only"}
@@ -221,7 +221,7 @@ function ApiKeysSection({ onAddKey }: { onAddKey: () => void }) {
                         checked={state.remember}
                         onChange={(event) => setRemember(id, event.target.checked)}
                       />
-                      Remember this {isEndpoint ? "endpoint" : "key"} on this device
+                      Remember this {noun} on this device
                     </label>
                   </div>
                   <div className="settings__key-actions">
