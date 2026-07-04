@@ -31,6 +31,13 @@ const MODELS_TIMEOUT_MS = 15_000;
 /** Cap on preview/inspect round-trips within a single propose() before we force a finalization. */
 const MAX_PREVIEW_ITERATIONS = 3;
 
+// Upper bound on tokens per completion. Unlike Anthropic's `max_tokens` (visible output only),
+// OpenAI's `max_completion_tokens` also has to cover the hidden reasoning tokens the o-series
+// spends before answering — a 4k cap can be entirely consumed by reasoning, leaving no output and
+// a `length` finish. This is a ceiling, not a reservation (billing is per token produced), so a
+// generous value is safe for non-reasoning models like gpt-4.1 too.
+const MAX_COMPLETION_TOKENS = 32_768;
+
 /** A JSON Schema tool spec in the shared `{ name, description, input_schema }` shape. */
 type ToolSpec = { name: string; description: string; input_schema: unknown };
 
@@ -255,7 +262,7 @@ export class OpenAiBrowserProvider implements AiProvider {
         model: this.model,
         // `max_completion_tokens` is the current param name and is accepted by reasoning models
         // (o-series) that reject the legacy `max_tokens`.
-        max_completion_tokens: 4096,
+        max_completion_tokens: MAX_COMPLETION_TOKENS,
         messages: [{ role: "system", content: system }, ...messages],
         ...(tools ? { tools } : {}),
         ...(toolChoice ? { tool_choice: toolChoice } : {}),

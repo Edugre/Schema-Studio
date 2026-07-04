@@ -3,9 +3,7 @@ import { useEffect, useState } from "react";
 
 import { useApiKeyContext } from "../copilot/ApiKeyContext.js";
 import { mergeModels } from "./models.js";
-import { useProviderPreference } from "./providerPreference.js";
 import { PROVIDERS, PROVIDER_IDS, type ProviderId } from "./providers.js";
-import { useAiProvider } from "./useAiProvider.js";
 import { useTargetPreference } from "./targetPreference.js";
 
 /** A selectable model tagged with the provider it belongs to, for the unified picker. */
@@ -16,54 +14,6 @@ function staticProviderModels(): ProviderModel[] {
   return PROVIDER_IDS.flatMap((id) =>
     PROVIDERS[id].catalog.map((model) => ({ ...model, provider: id })),
   );
-}
-
-/**
- * The list of selectable models for the picker. Seeds with the active provider's static catalog so
- * the dropdown is never empty, then — when a key is present — fetches the live list the key can
- * access and merges it in. Fetch failures (offline, lacking permission) silently keep the static
- * catalog.
- */
-export function useModels(): { models: ModelInfo[]; loading: boolean } {
-  const { provider: providerId } = useProviderPreference();
-  const catalog = PROVIDERS[providerId].catalog;
-  const provider = useAiProvider();
-  const [models, setModels] = useState<ModelInfo[]>(catalog);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!provider?.listModels) {
-      setModels(catalog);
-      return;
-    }
-
-    let active = true;
-    setLoading(true);
-    void provider
-      .listModels()
-      .then((fetched) => {
-        if (active) {
-          setModels(mergeModels(fetched, catalog));
-        }
-      })
-      .catch(() => {
-        // Keep the static catalog on any failure — the picker stays usable offline / without access.
-        if (active) {
-          setModels(catalog);
-        }
-      })
-      .finally(() => {
-        if (active) {
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [provider, catalog]);
-
-  return { models, loading };
 }
 
 /**
