@@ -183,6 +183,48 @@ describe("LocalBrowserProvider JSON fallback (models without tool calling)", () 
     expect(result.actions).toEqual([{ op: "add_table", name: "orders" }]);
   });
 
+  it("latches a hard tool rejection: later turns skip the doomed tool attempt", async () => {
+    const { calls } = stubFetch([
+      errorResponse(400, '{"error":"llama2 does not support tools"}'),
+      okResponse({ role: "assistant", content: JSON_REPLY }),
+      okResponse({ role: "assistant", content: JSON_REPLY }),
+    ]);
+
+    const provider = new LocalBrowserProvider("http://localhost:11434/v1", "llama2");
+    // Turn 1: tool attempt (rejected) → JSON retry. Two requests, first carries tools.
+    await provider.propose(EMPTY_SCHEMA, [], "first");
+    expect(calls).toHaveLength(2);
+    expect(calls[0]?.body["tools"]).toBeDefined();
+
+    // Turn 2: goes straight to JSON mode — a single request, no tools, no second rejection.
+    await provider.propose(EMPTY_SCHEMA, [], "second");
+    expect(calls).toHaveLength(3);
+    expect(calls[2]?.body["tools"]).toBeUndefined();
+  });
+
+  it("does NOT latch on a prose (non-tool-call) reply — tools are retried next turn", async () => {
+    const { calls } = stubFetch([
+      // Turn 1: prose (no tool_calls) → JSON retry.
+      okResponse({ role: "assistant", content: "thinking out loud…" }),
+      okResponse({ role: "assistant", content: JSON_REPLY }),
+      // Turn 2: tools attempted again; this time the model finalizes properly.
+      okResponse({
+        role: "assistant",
+        content: null,
+        tool_calls: [
+          toolCall(COPILOT_RESPONSE_TOOL.name, { reply: "ok", actions: [], status: "complete" }),
+        ],
+      }),
+    ]);
+
+    const provider = new LocalBrowserProvider();
+    await provider.propose(EMPTY_SCHEMA, [], "first");
+    await provider.propose(EMPTY_SCHEMA, [], "second");
+
+    // Turn 2's request must still carry tools (a prose reply is not a durable "no tools" signal).
+    expect(calls[2]?.body["tools"]).toBeDefined();
+  });
+
   it("surfaces a non-tool error unchanged (no fallback for an unrelated failure)", async () => {
     stubFetch([errorResponse(500, "internal server error")]);
     const provider = new LocalBrowserProvider();

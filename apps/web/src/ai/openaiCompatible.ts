@@ -163,6 +163,14 @@ function toolArgsOrEmpty(raw: string): Record<string, unknown> {
  * injected {@link OpenAiCompatibleConfig}, so a subclass is just a config.
  */
 export class OpenAiCompatibleProvider implements AiProvider {
+  /**
+   * Latched once a runtime hard-rejects tools, so later turns in the same conversation skip the
+   * doomed tool attempt and go straight to JSON mode. Set ONLY on a hard rejection — never from a
+   * one-off prose reply, since a model may call tools intermittently. Instance-scoped: a fresh
+   * provider (new key/model/endpoint) starts clean.
+   */
+  private toolsUnsupported = false;
+
   constructor(
     protected readonly config: OpenAiCompatibleConfig,
     protected readonly target: TargetId,
@@ -177,16 +185,27 @@ export class OpenAiCompatibleProvider implements AiProvider {
     // OpenAI has no cache-control blocks, so the static + dynamic halves collapse into one system
     // message (automatic prompt caching still applies to the stable prefix, no extra work).
     const system = buildCopilotSystemPrompt(schema, sources, this.target);
+
+    // This runtime already proved it can't do tool calls — don't pay the rejection round-trip again
+    // (the copilot's correction loop calls propose up to 4× per message).
+    if (this.config.allowJsonFallback && this.toolsUnsupported) {
+      return this.proposeJsonMode(system, message, history);
+    }
+
     try {
       return await this.proposeWithTools(system, schema, sources, message, history);
     } catch (error) {
-      // A runtime without function calling either rejects the request or answers in prose
-      // (ToolCallMissingError). When fallback is enabled, retry once in prompt-based JSON mode.
-      if (
-        this.config.allowJsonFallback &&
-        (error instanceof ToolCallMissingError || isToolUnsupportedError(error))
-      ) {
-        return this.proposeJsonMode(system, message, history);
+      // A runtime without function calling either rejects the request (isToolUnsupportedError — a
+      // durable property, so latch it) or answers in prose (ToolCallMissingError — possibly a
+      // one-off, so don't latch). Either way, when fallback is enabled, retry once in JSON mode.
+      if (this.config.allowJsonFallback) {
+        const hardReject = isToolUnsupportedError(error);
+        if (hardReject || error instanceof ToolCallMissingError) {
+          if (hardReject) {
+            this.toolsUnsupported = true;
+          }
+          return this.proposeJsonMode(system, message, history);
+        }
       }
       throw error;
     }
