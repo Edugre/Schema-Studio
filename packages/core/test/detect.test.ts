@@ -625,4 +625,33 @@ describe("detectFunctionalDependencies", () => {
     const tiny = tupleSource("orders.csv", ORDER_FIELDS, ordersRows().slice(0, 6));
     expect(detectFunctionalDependencies([tiny])).toEqual([]);
   });
+
+  it("tolerates occasional blank dependent cells without dropping the dependency", () => {
+    // One sampled row is missing the email for a customer whose email appears elsewhere —
+    // dirty data, not a conflicting value; customer_id → customer_email must still hold.
+    const rows = ordersRows().map((row, index) =>
+      index === 4 ? [row[0]!, row[1]!, row[2]!, "", row[4]!] : row,
+    );
+    const candidates = detectFunctionalDependencies([
+      tupleSource("orders.csv", ORDER_FIELDS, rows),
+    ]);
+
+    const byCustomerId = candidates.find((candidate) => candidate.determinant === "customer_id");
+    expect(byCustomerId?.dependents).toContain("customer_email");
+  });
+
+  it("never reports a mostly-blank column as a dependent, even when its rare values agree", () => {
+    // A sparse notes-like column: one consistent value per customer, blank everywhere else.
+    // Skipping blanks makes it trivially "hold" — the coverage gate must reject it.
+    const rows = ordersRows().map((row, index) => {
+      const customer = Math.floor(index / 3) + 1;
+      const note = index % 3 === 0 ? `note-${customer}` : "";
+      return [...row, note];
+    });
+    const candidates = detectFunctionalDependencies([
+      tupleSource("orders.csv", [...ORDER_FIELDS, "note"], rows),
+    ]);
+
+    expect(candidates.every((candidate) => !candidate.dependents.includes("note"))).toBe(true);
+  });
 });

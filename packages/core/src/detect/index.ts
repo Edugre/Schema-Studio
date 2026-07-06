@@ -1,5 +1,5 @@
-import type { Source, SourceField } from "../parse/types.js";
-import { collectStats } from "../parse/sample.js";
+import type { FieldStats, Source, SourceField } from "../parse/types.js";
+import { collectStats, isNullToken } from "../parse/sample.js";
 
 /**
  * Content-aware modeling primitives (SS-9). These are pure, deterministic functions
@@ -369,6 +369,40 @@ export function detectValueSets(sources: Source[], options?: ValueSetOptions): V
   return candidates;
 }
 
+type TupleColumnView = {
+  name: string;
+  /** The column's cell per sampled row, aligned with every other view's `values`. */
+  values: string[];
+  /** Sample-window stats over `values` (null-token-aware, via the shared helper). */
+  stats: FieldStats;
+  /** distinct/rows over the sample — lower means the column genuinely repeats. */
+  distinctRatio: number;
+  /** Full-scan-window repeat verdict; true when no stats exist (sample-only evidence). */
+  windowDuplicated: boolean;
+  /** Full-scan-window non-null verdict; true when no stats exist. */
+  windowBlankFree: boolean;
+};
+
+/**
+ * Per-column view over a source's sampled row tuples. Shared by the composite-key and
+ * functional-dependency detectors so their eligibility rules read the same evidence —
+ * each composes its own gates from these fields rather than re-deriving them.
+ */
+function tupleColumnViews(source: Source, rows: string[][]): TupleColumnView[] {
+  return source.fields.map((field, index) => {
+    const values = rows.map((row) => row[index] ?? "");
+    const stats = collectStats(values);
+    return {
+      name: field.name,
+      values,
+      stats,
+      distinctRatio: stats.distinct / rows.length,
+      windowDuplicated: field.stats ? keyRole(field) === "duplicated" : true,
+      windowBlankFree: field.stats ? field.stats.blank === 0 : true,
+    };
+  });
+}
+
 export type CompositeKeyCandidate = {
   sourceId: string;
   sourceName: string;
@@ -421,27 +455,20 @@ export function detectCompositeKeys(
       continue;
     }
 
-    // Per-column view over the tuples, using the shared stats helper (null-token-aware).
-    const columns = source.fields.map((field, index) => {
-      const values = rows.map((row) => row[index] ?? "");
-      const sampleStats = collectStats(values);
-      // A key column must be non-null, and a composite *member* must repeat BOTH in the
-      // tuple sample AND in the full scan window (when stats exist). Pair uniqueness is
-      // judged over the sample, so a column that is unique within the sample would make
-      // any pair containing it trivially "unique together" — requiring in-sample repeats
-      // keeps the two verdicts on the same window. The full-window check (via keyRole)
-      // additionally rejects columns that are near-unique overall.
-      const duplicatedInSample = sampleStats.distinct < sampleStats.nonEmpty;
-      const duplicatedInWindow = field.stats
-        ? field.stats.blank === 0 && keyRole(field) === "duplicated"
-        : true;
-      return {
-        name: field.name,
-        values,
-        eligible: sampleStats.blank === 0 && duplicatedInSample && duplicatedInWindow,
-        distinctRatio: sampleStats.distinct / rows.length,
-      };
-    });
+    // A key column must be non-null, and a composite *member* must repeat BOTH in the
+    // tuple sample AND in the full scan window (when stats exist). Pair uniqueness is
+    // judged over the sample, so a column that is unique within the sample would make
+    // any pair containing it trivially "unique together" — requiring in-sample repeats
+    // keeps the two verdicts on the same window. The full-window check additionally
+    // rejects columns that are near-unique overall.
+    const columns = tupleColumnViews(source, rows).map((column) => ({
+      ...column,
+      eligible:
+        column.stats.blank === 0 &&
+        column.stats.distinct < column.stats.nonEmpty &&
+        column.windowBlankFree &&
+        column.windowDuplicated,
+    }));
 
     const sourceCandidates: Array<CompositeKeyCandidate & { score: number }> = [];
 
@@ -516,6 +543,13 @@ export type FunctionalDependencyOptions = {
 };
 
 const MAX_FDS_PER_SOURCE = 3;
+/**
+ * Maximum share of blank cells for a column to qualify as an FD dependent. Blank dependent
+ * cells are skipped in the holds-check (dirty exports shouldn't hide a real dependency), so
+ * without this gate a mostly-blank column with one stray value per group would trivially
+ * "hold" and read as an extraction candidate.
+ */
+const MAX_DEPENDENT_BLANK_RATIO = 0.2;
 
 /**
  * Detect functional dependencies from the sampled row tuples: a column A such that every
@@ -526,11 +560,12 @@ const MAX_FDS_PER_SOURCE = 3;
  *
  * Trivial dependencies are excluded: the determinant must repeat (a unique column determines
  * everything) — both in the sample and, when full-window stats exist, in the scan window —
- * and a dependent must vary (a constant column is determined by anything). Rows where the
- * determinant is blank are skipped rather than grouped. Like the composite-key detector,
- * sample-window evidence is weaker than a full scan, so candidates are ranked (most
- * dependents first, then the most-repetitive determinant) and capped per source; sources
- * without `sampleRows` yield none.
+ * and a dependent must vary (a constant column is determined by anything). Blank dependent
+ * cells are skipped rather than treated as conflicting values, so occasional missing data
+ * doesn't hide a real dependency; a mostly-blank column can't qualify as a dependent at all
+ * (MAX_DEPENDENT_BLANK_RATIO). Like the composite-key detector, sample-window evidence is
+ * weaker than a full scan, so candidates are ranked (most dependents first, then the
+ * most-repetitive determinant) and capped per source; sources without `sampleRows` yield none.
  */
 export function detectFunctionalDependencies(
   sources: Source[],
@@ -547,24 +582,19 @@ export function detectFunctionalDependencies(
       continue;
     }
 
-    const columns = source.fields.map((field, index) => {
-      const values = rows.map((row) => row[index] ?? "");
-      const sampleStats = collectStats(values);
-      const duplicatedInWindow = field.stats ? keyRole(field) === "duplicated" : true;
-      return {
-        name: field.name,
-        values,
-        // A determinant must actually group rows: non-blank, repeating in the sample, and not
-        // near-unique over the full scan window (same reasoning as the composite-key gate).
-        canDetermine:
-          sampleStats.blank === 0 &&
-          sampleStats.distinct < sampleStats.nonEmpty &&
-          duplicatedInWindow,
-        // A dependent must vary — a constant column is trivially determined by anything.
-        canDepend: sampleStats.distinct > 1,
-        distinctRatio: sampleStats.distinct / rows.length,
-      };
-    });
+    const columns = tupleColumnViews(source, rows).map((column) => ({
+      ...column,
+      // A determinant must actually group rows: non-blank, repeating in the sample, and not
+      // near-unique over the full scan window (same reasoning as the composite-key gate).
+      canDetermine:
+        column.stats.blank === 0 &&
+        column.stats.distinct < column.stats.nonEmpty &&
+        column.windowDuplicated,
+      // A dependent must vary (a constant column is trivially determined by anything) and be
+      // populated enough that skipping its blank cells still leaves real evidence.
+      canDepend:
+        column.stats.distinct > 1 && column.stats.blank <= rows.length * MAX_DEPENDENT_BLANK_RATIO,
+    }));
 
     const sourceCandidates: Array<FunctionalDependencyCandidate & { score: number }> = [];
 
@@ -584,6 +614,11 @@ export function detectFunctionalDependencies(
         for (let row = 0; row < rows.length; row += 1) {
           const key = determinant.values[row] ?? "";
           const value = dependent.values[row] ?? "";
+          // A blank cell is missing data, not a conflicting value — dirty exports shouldn't
+          // hide a real dependency. Coverage is enforced by the canDepend gate above.
+          if (isNullToken(value)) {
+            continue;
+          }
           const seen = valueByGroup.get(key);
           if (seen === undefined) {
             valueByGroup.set(key, value);
@@ -601,7 +636,9 @@ export function detectFunctionalDependencies(
         continue;
       }
 
-      const groups = new Set(determinant.values).size;
+      // canDetermine requires zero blanks, so the sample-window distinct count IS the
+      // number of determinant groups — no need to rescan the rows.
+      const groups = determinant.stats.distinct;
       sourceCandidates.push({
         sourceId: source.id,
         sourceName: source.name,

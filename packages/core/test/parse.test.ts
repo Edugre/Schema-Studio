@@ -265,14 +265,27 @@ describe("collectStats", () => {
     expect(collectStats(["", "", ""])).toEqual({ nonEmpty: 0, distinct: 0, blank: 3 });
   });
 
-  it("captures a numeric range over the values that parse as numbers", () => {
-    const stats = collectStats(["-12.5", "40.7128", "90", "not-a-number"]);
+  it("captures a numeric range when every non-empty value is a plain number", () => {
+    const stats = collectStats(["-12.5", "40.7128", "90"]);
     expect(stats.min).toBe(-12.5);
     expect(stats.max).toBe(90);
   });
 
-  it("omits the numeric range for a non-numeric column", () => {
-    const stats = collectStats(["active", "closed", "active"]);
+  it("omits the numeric range for a non-numeric or mixed column", () => {
+    expect(collectStats(["active", "closed", "active"]).min).toBeUndefined();
+    // A partial range over the numeric subset would be evidence about values it never saw.
+    expect(collectStats(["-12.5", "40.7128", "not-a-number"]).min).toBeUndefined();
+  });
+
+  it("omits the numeric range for zero-padded identifier columns", () => {
+    // Number("02139") === 2139 — a stripped-padding range misleads for zips/padded ids.
+    const stats = collectStats(["02139", "94103"]);
+    expect(stats.min).toBeUndefined();
+    expect(stats.max).toBeUndefined();
+  });
+
+  it("omits the numeric range when values exceed safe-integer precision", () => {
+    const stats = collectStats(["12345678901234567890", "98765432109876543210"]);
     expect(stats.min).toBeUndefined();
     expect(stats.max).toBeUndefined();
   });

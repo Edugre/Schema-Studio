@@ -28,9 +28,11 @@ export const FieldStatsSchema = z.object({
   /** Empty/missing values scanned. */
   blank: z.number(),
   /**
-   * Numeric range over the scanned values that parse as plain numbers. Omitted when the
-   * column has none. Range evidence lets consumers judge plausibility (a [-90, 90] column
-   * can be a latitude; a [0, 120] one is more likely an age or a percentage).
+   * Numeric range over the scanned values. Present only when EVERY non-empty value is a
+   * plain, safe number without leading zeros — identifier-like columns (zero-padded zips,
+   * account numbers past safe-integer precision) and mixed columns carry no range, so this
+   * evidence is never lossy or misleading. Range evidence lets consumers judge plausibility
+   * (a [-90, 90] column can be a latitude; a [0, 120] one is more likely an age).
    */
   min: z.number().optional(),
   max: z.number().optional(),

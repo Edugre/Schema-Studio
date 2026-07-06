@@ -8,8 +8,23 @@ export const MAX_ROW_TUPLES = 200;
 /** Cap on retained per-field top-value frequencies (`FieldStats.topValues`). */
 export const MAX_TOP_VALUES = 8;
 
-/** A plain numeric literal — what min/max range stats are computed over. */
+/** A plain numeric literal — the shape min/max range stats are computed over. */
 const NUMERIC_VALUE = /^-?\d+(\.\d+)?$/;
+/** Leading zeros mark codes/identifiers (zero-padded zips, padded ids), not quantities. */
+const LEADING_ZERO = /^-?0\d/;
+
+/**
+ * The number a value contributes to range stats, or null when it must not: not a plain
+ * numeric literal, zero-padded (Number("02139") would silently strip the padding), or
+ * beyond safe-integer precision (18+-digit account numbers round in IEEE-754 doubles).
+ */
+function asRangeNumber(value: string): number | null {
+  if (!NUMERIC_VALUE.test(value) || LEADING_ZERO.test(value)) {
+    return null;
+  }
+  const parsed = Number(value);
+  return Math.abs(parsed) <= Number.MAX_SAFE_INTEGER ? parsed : null;
+}
 
 /**
  * Pick up to `limit` rows spread evenly across the whole file, preserving order. A head slice
@@ -61,7 +76,10 @@ export function collectStats(values: string[]): FieldStats {
   let blank = 0;
   let min = Number.POSITIVE_INFINITY;
   let max = Number.NEGATIVE_INFINITY;
-  let numericSeen = false;
+  // The range is only honest when EVERY non-empty value contributes to it: a partial range
+  // over the numeric subset of a mixed or identifier-like column reads as evidence about
+  // values it never saw.
+  let allNumeric = true;
   const limit = Math.min(values.length, MAX_SCAN_ROWS);
 
   for (let i = 0; i < limit; i++) {
@@ -73,10 +91,10 @@ export function collectStats(values: string[]): FieldStats {
     nonEmpty += 1;
     counts.set(value, (counts.get(value) ?? 0) + 1);
 
-    const trimmed = value.trim();
-    if (NUMERIC_VALUE.test(trimmed)) {
-      const parsed = Number(trimmed);
-      numericSeen = true;
+    const parsed = asRangeNumber(value.trim());
+    if (parsed === null) {
+      allNumeric = false;
+    } else {
       min = Math.min(min, parsed);
       max = Math.max(max, parsed);
     }
@@ -94,7 +112,7 @@ export function collectStats(values: string[]): FieldStats {
     nonEmpty,
     distinct: counts.size,
     blank,
-    ...(numericSeen ? { min, max } : {}),
+    ...(nonEmpty > 0 && allNumeric ? { min, max } : {}),
     ...(topValues.length > 0 ? { topValues } : {}),
   };
 }
