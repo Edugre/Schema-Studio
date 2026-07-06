@@ -5,6 +5,11 @@ export const MAX_INFERENCE_VALUES = 200;
 export const MAX_SAMPLES = 5;
 /** Cap on retained row tuples (`Source.sampleRows`) — enough for multi-column uniqueness checks. */
 export const MAX_ROW_TUPLES = 200;
+/** Cap on retained per-field top-value frequencies (`FieldStats.topValues`). */
+export const MAX_TOP_VALUES = 8;
+
+/** A plain numeric literal — what min/max range stats are computed over. */
+const NUMERIC_VALUE = /^-?\d+(\.\d+)?$/;
 
 /**
  * Pick up to `limit` rows spread evenly across the whole file, preserving order. A head slice
@@ -50,22 +55,48 @@ function isNonEmpty(value: string | null | undefined): value is string {
  * samples.
  */
 export function collectStats(values: string[]): FieldStats {
-  const distinctValues = new Set<string>();
+  // Insertion order is preserved, so equal counts later sort by first appearance.
+  const counts = new Map<string, number>();
   let nonEmpty = 0;
   let blank = 0;
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
+  let numericSeen = false;
   const limit = Math.min(values.length, MAX_SCAN_ROWS);
 
   for (let i = 0; i < limit; i++) {
     const value = values[i];
-    if (isNonEmpty(value)) {
-      nonEmpty += 1;
-      distinctValues.add(value);
-    } else {
+    if (!isNonEmpty(value)) {
       blank += 1;
+      continue;
+    }
+    nonEmpty += 1;
+    counts.set(value, (counts.get(value) ?? 0) + 1);
+
+    const trimmed = value.trim();
+    if (NUMERIC_VALUE.test(trimmed)) {
+      const parsed = Number(trimmed);
+      numericSeen = true;
+      min = Math.min(min, parsed);
+      max = Math.max(max, parsed);
     }
   }
 
-  return { nonEmpty, distinct: distinctValues.size, blank };
+  // Only values that actually repeat carry skew/enum information; a fully-unique column
+  // (ids) would just leak arbitrary values into every persisted stats block.
+  const topValues = [...counts.entries()]
+    .filter(([, count]) => count >= 2)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, MAX_TOP_VALUES)
+    .map(([value, count]) => ({ value, count }));
+
+  return {
+    nonEmpty,
+    distinct: counts.size,
+    blank,
+    ...(numericSeen ? { min, max } : {}),
+    ...(topValues.length > 0 ? { topValues } : {}),
+  };
 }
 
 /**

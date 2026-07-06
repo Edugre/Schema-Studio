@@ -247,16 +247,50 @@ describe("null-token handling in stats", () => {
 
 describe("collectStats", () => {
   it("counts non-empty, distinct, and blank values", () => {
-    expect(collectStats(["a", "b", "a", "", "c"])).toEqual({ nonEmpty: 4, distinct: 3, blank: 1 });
+    expect(collectStats(["a", "b", "a", "", "c"])).toEqual({
+      nonEmpty: 4,
+      distinct: 3,
+      blank: 1,
+      topValues: [{ value: "a", count: 2 }],
+    });
   });
 
   it("reports a unique, non-blank column (a PK candidate) as distinct === nonEmpty", () => {
     const stats = collectStats(["1", "2", "3", "4"]);
-    expect(stats).toEqual({ nonEmpty: 4, distinct: 4, blank: 0 });
+    // A fully-unique column carries no repeating values, so topValues is omitted.
+    expect(stats).toEqual({ nonEmpty: 4, distinct: 4, blank: 0, min: 1, max: 4 });
   });
 
   it("handles an all-empty column", () => {
     expect(collectStats(["", "", ""])).toEqual({ nonEmpty: 0, distinct: 0, blank: 3 });
+  });
+
+  it("captures a numeric range over the values that parse as numbers", () => {
+    const stats = collectStats(["-12.5", "40.7128", "90", "not-a-number"]);
+    expect(stats.min).toBe(-12.5);
+    expect(stats.max).toBe(90);
+  });
+
+  it("omits the numeric range for a non-numeric column", () => {
+    const stats = collectStats(["active", "closed", "active"]);
+    expect(stats.min).toBeUndefined();
+    expect(stats.max).toBeUndefined();
+  });
+
+  it("ranks repeating values by frequency, capped, ties by first appearance", () => {
+    const values = [
+      ...Array.from({ length: 5 }, () => "active"),
+      ...Array.from({ length: 3 }, () => "closed"),
+      "pending",
+      "pending",
+      "one-off",
+    ];
+    const stats = collectStats(values);
+    expect(stats.topValues).toEqual([
+      { value: "active", count: 5 },
+      { value: "closed", count: 3 },
+      { value: "pending", count: 2 },
+    ]);
   });
 });
 
@@ -275,8 +309,13 @@ describe("parseCsv", () => {
   it("attaches per-field stats distinguishing a unique key from a repeated column", () => {
     const source = parseCsv("id,status\n1,active\n2,active\n3,closed\n", "stats.csv", opts);
 
-    expect(source.fields[0]?.stats).toEqual({ nonEmpty: 3, distinct: 3, blank: 0 });
-    expect(source.fields[1]?.stats).toEqual({ nonEmpty: 3, distinct: 2, blank: 0 });
+    expect(source.fields[0]?.stats).toMatchObject({ nonEmpty: 3, distinct: 3, blank: 0 });
+    expect(source.fields[1]?.stats).toMatchObject({
+      nonEmpty: 3,
+      distinct: 2,
+      blank: 0,
+      topValues: [{ value: "active", count: 2 }],
+    });
   });
 
   it("dedupes duplicate headers deterministically", () => {
