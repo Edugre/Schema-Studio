@@ -98,13 +98,15 @@ export function HomePage({
 
   const derive = (input: DeriveInput) => {
     setModalOpen(false);
-    // When auto-draft is on, send a framed prompt and let the Copilot draft a ghost schema.
-    // Otherwise preserve today's behavior: seed the raw description into the input to send manually.
-    const kickoff: CopilotKickoff | undefined = autoDraft
-      ? { message: buildInitialSchemaPrompt(input), autoDraft: true }
-      : input.description
-        ? { message: input.description, autoDraft: false }
-        : undefined;
+    // When auto-draft is on AND there are files to draft from, send a framed prompt and let the
+    // Copilot draft a ghost schema. With no files there's nothing to derive, so fall back to
+    // today's behavior: seed the raw description into the input to send manually (or nothing).
+    const kickoff: CopilotKickoff | undefined =
+      autoDraft && input.sources.length > 0
+        ? { message: buildInitialSchemaPrompt(input), autoDraft: true }
+        : input.description
+          ? { message: input.description, autoDraft: false }
+          : undefined;
     // Await the new project so its sources are in the store before the editor (and any auto-draft)
     // reads them, then enter.
     void createProject({ name: input.name, sources: input.sources }).then(() =>

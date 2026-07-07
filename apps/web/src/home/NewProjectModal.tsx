@@ -330,7 +330,9 @@ export function NewProjectModal({
             </button>
             <button type="button" className="npm-btn npm-btn--primary" onClick={derive}>
               <FilePlusIcon size={15} />
-              {autoDraft ? "Derive schema" : "Create project"}
+              {/* "Derive schema" only when there are files to derive from; an empty project is
+                  always just "Create project", even with AI drafting on. */}
+              {autoDraft && hasFiles ? "Derive schema" : "Create project"}
             </button>
           </div>
         </footer>
