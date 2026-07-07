@@ -258,6 +258,82 @@ describe("fromSql", () => {
     expect(schema.tables).toHaveLength(1);
   });
 
+  it("does not mistake PRIMARY KEY / REFERENCES inside CHECK or DEFAULT for real constraints", () => {
+    const { schema } = fromSql(
+      [
+        "CREATE TABLE orgs (id integer PRIMARY KEY);",
+        "CREATE TABLE t (",
+        "  a text CHECK (a <> 'primary key'),",
+        "  body text DEFAULT 'references orgs',",
+        "  label text",
+        ");",
+      ].join("\n"),
+      { makeId: counterIds() },
+    );
+
+    const t = schema.tables.find((table) => table.name === "t")!;
+    // The CHECK text must not make `a` a primary key.
+    expect(t.fields.every((f) => !f.pk)).toBe(true);
+    // The DEFAULT literal must not create a foreign key.
+    expect(schema.relationships).toEqual([]);
+    expect(t.fields.find((f) => f.name === "body")!.fk).toBe(false);
+  });
+
+  it("still reads a real inline constraint that sits alongside a CHECK or DEFAULT", () => {
+    const { schema, warnings } = fromSql(
+      [
+        "CREATE TABLE orgs (id integer PRIMARY KEY);",
+        "CREATE TABLE t (",
+        "  id integer PRIMARY KEY CHECK (id > 0),",
+        "  org_id integer DEFAULT 0 REFERENCES orgs (id)",
+        ");",
+      ].join("\n"),
+      { makeId: counterIds() },
+    );
+
+    expect(warnings).toEqual([]);
+    const t = schema.tables.find((table) => table.name === "t")!;
+    expect(t.fields.find((f) => f.name === "id")!.pk).toBe(true);
+    expect(t.fields.find((f) => f.name === "org_id")!.fk).toBe(true);
+    expect(schema.relationships).toHaveLength(1);
+  });
+
+  it("keeps a dollar-quoted function body as a single skipped statement", () => {
+    const { schema, warnings } = fromSql(
+      [
+        "CREATE TABLE t (id integer PRIMARY KEY);",
+        "CREATE FUNCTION f() RETURNS trigger AS $$",
+        "BEGIN",
+        "  INSERT INTO audit VALUES (1);",
+        "  RETURN NEW;",
+        "END;",
+        "$$ LANGUAGE plpgsql;",
+      ].join("\n"),
+      { makeId: counterIds() },
+    );
+
+    expect(schema.tables.map((table) => table.name)).toEqual(["t"]);
+    // The whole function is one skipped statement, not one warning per internal semicolon.
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("CREATE FUNCTION");
+  });
+
+  it("does not treat CREATE TABLE inside a dollar-quoted body as a real table", () => {
+    const { schema } = fromSql(
+      [
+        "CREATE TABLE real_table (id integer PRIMARY KEY);",
+        "CREATE FUNCTION seed() RETURNS void AS $body$",
+        "BEGIN",
+        "  CREATE TABLE not_a_real_table (id integer PRIMARY KEY);",
+        "END;",
+        "$body$ LANGUAGE plpgsql;",
+      ].join("\n"),
+      { makeId: counterIds() },
+    );
+
+    expect(schema.tables.map((table) => table.name)).toEqual(["real_table"]);
+  });
+
   it("warns and skips a statement it cannot model", () => {
     const { schema, warnings } = fromSql(
       ["CREATE TABLE t (id integer PRIMARY KEY);", "CREATE INDEX idx_t_id ON t (id);"].join("\n"),

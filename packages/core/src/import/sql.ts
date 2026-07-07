@@ -341,9 +341,13 @@ function preview(statement: string): string {
   return collapsed.length > 60 ? `${collapsed.slice(0, 60)}…` : collapsed;
 }
 
+/** Matches a Postgres dollar-quote opener (`$$` or `$tag$`) at the start of a string. */
+const DOLLAR_QUOTE_OPEN = /^\$([A-Za-z_][A-Za-z0-9_]*)?\$/;
+
 /**
  * Split a SQL script into statements on top-level `;`, stripping line and block comments and
- * respecting string/quoted-identifier literals.
+ * respecting string/quoted-identifier literals and dollar-quoted bodies (`$$ … $$`, `$tag$ … $tag$`)
+ * — so a `CREATE FUNCTION` body's internal semicolons don't split it into fragments.
  */
 function splitStatements(sql: string): string[] {
   const statements: string[] = [];
@@ -351,6 +355,7 @@ function splitStatements(sql: string): string[] {
   let inString: string | null = null;
   let inLineComment = false;
   let inBlockComment = false;
+  let dollarTag: string | null = null;
   for (let i = 0; i < sql.length; i++) {
     const ch = sql[i]!;
     const next = sql[i + 1];
@@ -381,6 +386,18 @@ function splitStatements(sql: string): string[] {
       }
       continue;
     }
+    if (dollarTag) {
+      // Everything up to the matching close tag is a literal body — semicolons and quotes inside
+      // are inert.
+      if (sql.startsWith(dollarTag, i)) {
+        current += dollarTag;
+        i += dollarTag.length - 1;
+        dollarTag = null;
+      } else {
+        current += ch;
+      }
+      continue;
+    }
     if (ch === "-" && next === "-") {
       inLineComment = true;
       i++;
@@ -390,6 +407,15 @@ function splitStatements(sql: string): string[] {
       inBlockComment = true;
       i++;
       continue;
+    }
+    if (ch === "$") {
+      const open = DOLLAR_QUOTE_OPEN.exec(sql.slice(i));
+      if (open) {
+        dollarTag = open[0];
+        current += open[0];
+        i += open[0].length - 1;
+        continue;
+      }
     }
     if (ch === "'" || ch === '"') {
       inString = ch;
@@ -415,6 +441,55 @@ const SILENTLY_SKIPPED =
 
 const CREATE_TABLE_HEAD =
   /^create\s+(?:global\s+|local\s+|temp\s+|temporary\s+|unlogged\s+)*table\s+(?:if\s+not\s+exists\s+)?/i;
+
+/**
+ * Blank out (with spaces, preserving indices) every character inside a string literal or a
+ * parenthesized group. Used before scanning a column's modifier tail for `PRIMARY KEY` / `REFERENCES`
+ * so those keywords appearing inside a `CHECK (...)` expression or a `DEFAULT '...'` literal aren't
+ * mistaken for real constraints. The real inline keywords sit outside any parens/quotes, so they
+ * survive the mask; positions still line up with the original text for follow-on parsing.
+ */
+function maskModifiers(text: string): string {
+  const out = text.split("");
+  let inString: string | null = null;
+  let depth = 0;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]!;
+    if (inString) {
+      out[i] = " ";
+      if (ch === inString) {
+        if (text[i + 1] === inString) {
+          out[i + 1] = " ";
+          i++;
+          continue;
+        }
+        inString = null;
+      }
+      continue;
+    }
+    if (ch === "'" || ch === '"') {
+      inString = ch;
+      out[i] = " ";
+      continue;
+    }
+    if (ch === "(") {
+      depth++;
+      out[i] = " ";
+      continue;
+    }
+    if (ch === ")") {
+      if (depth > 0) {
+        depth--;
+      }
+      out[i] = " ";
+      continue;
+    }
+    if (depth > 0) {
+      out[i] = " ";
+    }
+  }
+  return out.join("");
+}
 
 /** Parse `REFERENCES table [(columns)]` starting at `pos`, given the referencing columns. */
 function parseReferences(text: string, pos: number, fromColumns: string[]): RawForeignKey | null {
@@ -481,13 +556,16 @@ function parseTableItem(item: string, table: RawTable): void {
     return;
   }
   const modifiers = s.slice(typeRead.next);
+  // Scan a masked copy so PRIMARY KEY / REFERENCES inside a CHECK (...) or DEFAULT '...' aren't
+  // misread as real constraints; indices still map back to `modifiers` for follow-on parsing.
+  const masked = maskModifiers(modifiers);
   table.columns.push({
     name: nameRead.name,
     type: normalizeType(typeRead.type),
-    pk: /\bprimary\s+key\b/i.test(modifiers),
+    pk: /\bprimary\s+key\b/i.test(masked),
   });
 
-  const refMatch = /\breferences\b/i.exec(modifiers);
+  const refMatch = /\breferences\b/i.exec(masked);
   if (refMatch) {
     const fk = parseReferences(modifiers, refMatch.index + refMatch[0].length, [nameRead.name]);
     if (fk) {
