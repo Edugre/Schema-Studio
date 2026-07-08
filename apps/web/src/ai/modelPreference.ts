@@ -9,12 +9,10 @@ import { PROVIDERS, type ProviderId } from "./providers.js";
  * event keeps other readers in this tab in sync; the native `storage` event covers other tabs.
  */
 
-const CHANGE_EVENT = "schema-studio:model-change";
-/** The pre-multi-provider unscoped key — read once as a fallback so a saved Claude model survives. */
-const LEGACY_KEY = "schema-studio:model";
+const CHANGE_EVENT = "grafture:model-change";
 
 function storageKey(provider: ProviderId): string {
-  return `schema-studio:model:${provider}`;
+  return `grafture:model:${provider}`;
 }
 
 export function readModelPreference(provider: ProviderId): string {
@@ -22,13 +20,6 @@ export function readModelPreference(provider: ProviderId): string {
     const scoped = window.localStorage.getItem(storageKey(provider));
     if (scoped) {
       return scoped;
-    }
-    // The old unscoped key was Anthropic-only; honor it so existing users keep their choice.
-    if (provider === "anthropic") {
-      const legacy = window.localStorage.getItem(LEGACY_KEY);
-      if (legacy) {
-        return legacy;
-      }
     }
     // Empty when the provider has no default (local) — it's unusable until a model is picked.
     return PROVIDERS[provider].defaultModel ?? "";

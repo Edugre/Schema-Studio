@@ -9,7 +9,7 @@
   font-weight: 400;
 
   /* ---- Design tokens (light is canonical; dark overrides below) ----
-     Sourced from the Schema Studio design handoff. The semantic names map
+     Sourced from the Grafture design handoff. The semantic names map
      onto the design's color roles; legacy aliases are kept so existing
      component CSS picks up the new palette without churn. */
 

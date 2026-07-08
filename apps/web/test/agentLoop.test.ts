@@ -1,4 +1,4 @@
-import type { ConversationTurn, CopilotStatus } from "@schema-studio/core";
+import type { ConversationTurn, CopilotStatus } from "@grafture/core";
 import { describe, expect, it, vi } from "vitest";
 
 import {

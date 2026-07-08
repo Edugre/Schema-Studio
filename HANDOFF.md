@@ -1,4 +1,4 @@
-# Schema Studio — Collaboration Handoff
+# Grafture — Collaboration Handoff
 
 > Single source of truth for two people working the codebase together. Self-contained:
 > the task board (§5), the deferred design-follow-up index (§6), and the locked decisions
@@ -9,7 +9,7 @@
 
 ## 1. What this is (30-second version)
 
-Schema Studio turns heterogeneous source files (CSV / Excel / JSON) into a proposed,
+Grafture turns heterogeneous source files (CSV / Excel / JSON) into a proposed,
 AI-reasoned relational schema and exports real migrations. It is **not** another ERD
 editor: every competitor (ChartDB, DrawDB, Azimutt) starts from a database you already
 have. We start from **raw data you need to integrate**.

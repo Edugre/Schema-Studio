@@ -1,4 +1,4 @@
-import type { Schema, Source } from "@schema-studio/core";
+import type { Schema, Source } from "@grafture/core";
 import { describe, expect, it } from "vitest";
 
 import { MemoryKeyValueStore } from "../src/persistence/kv.js";
@@ -255,7 +255,7 @@ describe("project file serialization", () => {
 
   it("rejects files without the project marker", () => {
     const result = parseProjectFile(JSON.stringify({ schema: sampleSchema(), sources: [] }));
-    expect(result).toEqual({ ok: false, error: "Not a Schema Studio project file." });
+    expect(result).toEqual({ ok: false, error: "Not a Grafture project file." });
   });
 
   it("rejects a structurally invalid schema instead of loading it partially", () => {

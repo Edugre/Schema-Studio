@@ -1,4 +1,4 @@
-import type { CopilotStatus } from "@schema-studio/core";
+import type { CopilotStatus } from "@grafture/core";
 
 export type ParsedCopilotResponse = {
   reply: string;

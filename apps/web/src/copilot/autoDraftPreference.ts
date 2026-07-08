@@ -8,8 +8,8 @@ import { useCallback, useEffect, useState } from "react";
  * Settings. A custom event keeps any other mounted reader in sync within the same tab.
  */
 
-const STORAGE_KEY = "schema-studio:auto-draft";
-const CHANGE_EVENT = "schema-studio:auto-draft-change";
+const STORAGE_KEY = "grafture:auto-draft";
+const CHANGE_EVENT = "grafture:auto-draft-change";
 
 export function readAutoDraftPreference(): boolean {
   try {

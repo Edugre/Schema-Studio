@@ -32,7 +32,7 @@ importers:
 
   apps/web:
     dependencies:
-      '@schema-studio/core':
+      '@grafture/core':
         specifier: workspace:*
         version: link:../../packages/core
       '@xyflow/react':

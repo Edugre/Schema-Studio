@@ -5,8 +5,8 @@ import type {
   PrimaryKeyCandidate,
   Schema,
   Source,
-} from "@schema-studio/core";
-import { detectJoinKeys, detectPrimaryKeys } from "@schema-studio/core";
+} from "@grafture/core";
+import { detectJoinKeys, detectPrimaryKeys } from "@grafture/core";
 
 import { tableNameFromFilename } from "../sources/tableName.js";
 

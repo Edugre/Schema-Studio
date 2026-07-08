@@ -1,4 +1,4 @@
-import type { Schema } from "@schema-studio/core";
+import type { Schema } from "@grafture/core";
 
 export function tableNameFromFilename(filename: string): string {
   const base = filename.replace(/\.[^.]+$/, "");

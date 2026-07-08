@@ -21,7 +21,7 @@ export class MemoryKeyValueStore implements KeyValueStore {
   }
 }
 
-const DB_NAME = "schema-studio";
+const DB_NAME = "grafture";
 const STORE_NAME = "kv";
 const DB_VERSION = 1;
 

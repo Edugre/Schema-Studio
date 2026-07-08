@@ -1,4 +1,4 @@
-import type { Schema, Source, SourceField } from "@schema-studio/core";
+import type { Schema, Source, SourceField } from "@grafture/core";
 
 import type { RunActionsResult } from "../store/index.js";
 import { tableNameFromFilename, uniqueTableName } from "./tableName.js";

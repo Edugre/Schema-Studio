@@ -1,4 +1,4 @@
-import { DEFAULT_TARGET } from "@schema-studio/core";
+import { DEFAULT_TARGET } from "@grafture/core";
 import { describe, expect, it } from "vitest";
 
 import { LocalBrowserProvider } from "../src/ai/LocalBrowserProvider.js";

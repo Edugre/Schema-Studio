@@ -1,5 +1,5 @@
-import type { ModelInfo } from "@schema-studio/core";
-import { DEFAULT_TARGET } from "@schema-studio/core";
+import type { ModelInfo } from "@grafture/core";
+import { DEFAULT_TARGET } from "@grafture/core";
 import { useEffect, useState } from "react";
 
 import { useApiKeyContext } from "../copilot/ApiKeyContext.js";

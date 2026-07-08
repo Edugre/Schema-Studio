@@ -1,4 +1,4 @@
-import type { Schema, Source, TargetId } from "@schema-studio/core";
+import type { Schema, Source, TargetId } from "@grafture/core";
 import {
   DEFAULT_TARGET,
   describeTargetForPrompt,
@@ -9,7 +9,7 @@ import {
   detectSemanticTypes,
   detectValueSets,
   getTargetProfile,
-} from "@schema-studio/core";
+} from "@grafture/core";
 
 import { COPILOT_RESPONSE_TOOL } from "./responseTool.js";
 import { PREVIEW_EXPORT_TOOL } from "./exportPreviewTool.js";
@@ -221,7 +221,7 @@ export function buildStaticInstructions(targetId: TargetId = DEFAULT_TARGET): st
   const target = getTargetProfile(targetId);
 
   return [
-    `You are Schema Studio's schema design copilot for ${target.label}.`,
+    `You are Grafture's schema design copilot for ${target.label}.`,
     "You help users derive a relational schema from raw source files by reasoning over actual sample values — not just column names — and you model toward the target stack, in its own types and idioms.",
     "",
     "<target>",
@@ -339,7 +339,7 @@ export function buildCopilotSystemPrompt(
  */
 export function buildRerankSystemPrompt(schema: Schema, sources: Source[]): string {
   return [
-    "You are Schema Studio's suggestion reranker.",
+    "You are Grafture's suggestion reranker.",
     "You are given a list of already-validated, content-aware schema suggestions (candidate primary",
     "keys, foreign-key joins, and column-type refinements) detected deterministically from the data.",
     "Your job is ONLY to rank them by how likely a data engineer is to want each one, and to explain",

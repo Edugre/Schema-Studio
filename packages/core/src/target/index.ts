@@ -6,7 +6,7 @@ import { z } from "zod";
  * proposes types/keys/relationships that actually round-trip through the exporters in
  * `../export`. This is the "libraries and tools" the copilot is contextualized on.
  *
- * Grounded in the exporters: the canonical Schema Studio types (`int | numeric | bool | date |
+ * Grounded in the exporters: the canonical Grafture types (`int | numeric | bool | date |
  * timestamp | text`) map cleanly to every target; Postgres emits any other type verbatim, Prisma falls back
  * to `String`. The profiles below encode exactly that so the model's output stays exportable.
  */

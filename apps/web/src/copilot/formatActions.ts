@@ -1,4 +1,4 @@
-import type { Schema } from "@schema-studio/core";
+import type { Schema } from "@grafture/core";
 
 import type { RunActionsResult } from "../store/index.js";
 

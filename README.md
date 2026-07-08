@@ -1,19 +1,19 @@
-# Schema Studio
+# Grafture
 
 **Turn a pile of raw files into a relational schema — then export real migrations.**
 
-Schema Studio takes heterogeneous source files (CSV, Excel, JSON) and proposes an
+Grafture takes heterogeneous source files (CSV, Excel, JSON) and proposes an
 AI-reasoned relational schema you can refine on a canvas and export as DBML, SQL, or Prisma.
 
 It is **not** another ERD editor. Every mature tool in this space starts from a database or
-a schema you already have. Schema Studio starts from the **raw data you need to integrate**
+a schema you already have. Grafture starts from the **raw data you need to integrate**
 and helps you derive the schema you don't have yet.
 
 ---
 
 ## What makes it different: content-aware modeling
 
-Adding boxes to a canvas is table-stakes. The point of Schema Studio is that it **reasons
+Adding boxes to a canvas is table-stakes. The point of Grafture is that it **reasons
 over your actual sample values**, not just column names:
 
 - **Proposes join keys** by looking at where values actually overlap across files.

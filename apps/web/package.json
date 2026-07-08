@@ -1,5 +1,5 @@
 {
-  "name": "@schema-studio/web",
+  "name": "@grafture/web",
   "version": "0.0.0",
   "private": true,
   "license": "MIT",
@@ -12,7 +12,7 @@
     "lint": "eslint src"
   },
   "dependencies": {
-    "@schema-studio/core": "workspace:*",
+    "@grafture/core": "workspace:*",
     "@xyflow/react": "^12.7.0",
     "elkjs": "^0.10.0",
     "immer": "^10.1.1",

@@ -1,4 +1,4 @@
-import type { Schema, Table } from "@schema-studio/core";
+import type { Schema, Table } from "@grafture/core";
 
 import { tableNameFromFilename } from "../sources/tableName.js";
 import type { SuggestionItem } from "../suggest/index.js";

@@ -1,4 +1,4 @@
-import { ParseError, parseSource, type Source } from "@schema-studio/core";
+import { ParseError, parseSource, type Source } from "@grafture/core";
 
 import { detectSourceKind } from "./detectKind.js";
 

@@ -1,4 +1,4 @@
-import type { AiProvider } from "@schema-studio/core";
+import type { AiProvider } from "@grafture/core";
 import { useMemo } from "react";
 
 import { useApiKeyContext } from "../copilot/ApiKeyContext.js";

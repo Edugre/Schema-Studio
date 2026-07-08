@@ -1,5 +1,5 @@
-import type { Source } from "@schema-studio/core";
-import { ParseError } from "@schema-studio/core";
+import type { Source } from "@grafture/core";
+import { ParseError } from "@grafture/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { readAndParseFile } from "../sources/readAndParse.js";
@@ -206,7 +206,7 @@ export function NewProjectModal({
             </h2>
             <p className="npm-header__subtitle">
               {autoDraft
-                ? "Drop your raw files and give Schema Studio context to infer the schema."
+                ? "Drop your raw files and give Grafture context to infer the schema."
                 : "Add source files to start from, or create an empty project — you can add files later."}
             </p>
           </div>

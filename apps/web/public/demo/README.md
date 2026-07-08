@@ -1,6 +1,6 @@
 # Demo dataset
 
-Two small, hand-crafted files that show off Schema Studio's **content-aware modeling**. They
+Two small, hand-crafted files that show off Grafture's **content-aware modeling**. They
 mirror the shape of real 340B / HRSA data without redistributing any of it.
 
 | File                    | Represents                                  | Grain                            |
@@ -22,7 +22,7 @@ normalization**:
 - `health_centers.csv` stores it as `grant_number` **with leading zeros** (`00489012`).
 - `covered_entities.json` stores the same grant as `grant_num` **without them** (`489012`).
 
-So Schema Studio should:
+So Grafture should:
 
 - **Propose a join** between `grant_number` and `grant_num` from their overlapping values.
 - **Warn about the format mismatch** — the identifiers won't match on a raw equality join

@@ -1,4 +1,4 @@
-import type { SuggestionDigest, SuggestionRanking } from "@schema-studio/core";
+import type { SuggestionDigest, SuggestionRanking } from "@grafture/core";
 import { z } from "zod";
 
 import { extractJsonObject } from "../copilot/parseResponse.js";

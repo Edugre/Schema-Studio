@@ -1,5 +1,5 @@
-import type { FieldStats, JoinKeyCandidate, Schema, Source } from "@schema-studio/core";
-import { detectJoinKeys, emptySchema } from "@schema-studio/core";
+import type { FieldStats, JoinKeyCandidate, Schema, Source } from "@grafture/core";
+import { detectJoinKeys, emptySchema } from "@grafture/core";
 import { describe, expect, it } from "vitest";
 
 import {

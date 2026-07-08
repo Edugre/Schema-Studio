@@ -1,4 +1,4 @@
-import type { AiProvider, ModelInfo, TargetId } from "@schema-studio/core";
+import type { AiProvider, ModelInfo, TargetId } from "@grafture/core";
 
 import { AnthropicBrowserProvider } from "./AnthropicBrowserProvider.js";
 import { LocalBrowserProvider } from "./LocalBrowserProvider.js";

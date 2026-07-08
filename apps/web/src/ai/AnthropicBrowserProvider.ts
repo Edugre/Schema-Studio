@@ -8,8 +8,8 @@ import type {
   SuggestionDigest,
   SuggestionRanking,
   TargetId,
-} from "@schema-studio/core";
-import { DEFAULT_TARGET } from "@schema-studio/core";
+} from "@grafture/core";
+import { DEFAULT_TARGET } from "@grafture/core";
 
 import {
   buildDynamicContext,

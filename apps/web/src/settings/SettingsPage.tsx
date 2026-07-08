@@ -1,4 +1,4 @@
-import { TARGET_PROFILES, TargetIdSchema, type TargetId } from "@schema-studio/core";
+import { TARGET_PROFILES, TargetIdSchema, type TargetId } from "@grafture/core";
 import { useState, type ReactNode } from "react";
 
 import { setModelPreference, useModelPreference } from "../ai/modelPreference.js";
@@ -75,7 +75,7 @@ export function SettingsPage({ onBack, onAddKey }: { onBack: () => void; onAddKe
           <span className="settings__wordmark">Settings</span>
         </div>
         <span className="settings__avatar" aria-hidden>
-          SS
+          G
         </span>
       </header>
 
@@ -181,8 +181,8 @@ function ApiKeysSection({ onAddKey }: { onAddKey: () => void }) {
       <div className="settings__banner">
         <InfoIcon size={16} />
         <span>
-          Keys are stored only in this browser and sent directly to the provider you select. Schema
-          Studio never receives or proxies them.
+          Keys are stored only in this browser and sent directly to the provider you select.
+          Grafture never receives or proxies them.
         </span>
       </div>
 
@@ -376,7 +376,7 @@ function AppearanceSection() {
       <div className="settings__page-header">
         <div>
           <h1 className="settings__title">Appearance</h1>
-          <p className="settings__subtitle">How Schema Studio looks on this device.</p>
+          <p className="settings__subtitle">How Grafture looks on this device.</p>
         </div>
       </div>
 

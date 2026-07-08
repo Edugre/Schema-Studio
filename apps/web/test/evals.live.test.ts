@@ -1,4 +1,4 @@
-import { applyActions, emptySchema, parseCsv } from "@schema-studio/core";
+import { applyActions, emptySchema, parseCsv } from "@grafture/core";
 import { describe, expect, it } from "vitest";
 
 import { AnthropicBrowserProvider } from "../src/ai/AnthropicBrowserProvider.js";
@@ -10,7 +10,7 @@ import { buildInitialSchemaPrompt } from "../src/copilot/kickoff.js";
  * the flattened orders file must be split by entity rather than mirrored one-table-per-file,
  * and every emitted action must apply cleanly through core's validator.
  *
- * Run: ANTHROPIC_API_KEY=sk-... pnpm --filter @schema-studio/web exec vitest run test/evals.live.test.ts
+ * Run: ANTHROPIC_API_KEY=sk-... pnpm --filter @grafture/web exec vitest run test/evals.live.test.ts
  */
 
 const apiKey = process.env["ANTHROPIC_API_KEY"];

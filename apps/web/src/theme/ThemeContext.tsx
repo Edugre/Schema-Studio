@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 
 export type Theme = "light" | "dark" | "system";
 
-const STORAGE_KEY = "schema-studio:theme";
+const STORAGE_KEY = "grafture:theme";
 
 type ThemeContextValue = {
   theme: Theme;

@@ -7,8 +7,8 @@ import { useCallback, useEffect, useState } from "react";
  * Settings page and the suggestions hook) in sync within the same tab.
  */
 
-const STORAGE_KEY = "schema-studio:rerank-suggestions";
-const CHANGE_EVENT = "schema-studio:rerank-suggestions-change";
+const STORAGE_KEY = "grafture:rerank-suggestions";
+const CHANGE_EVENT = "grafture:rerank-suggestions-change";
 
 export function readRerankPreference(): boolean {
   try {

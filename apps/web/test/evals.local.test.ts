@@ -1,4 +1,4 @@
-import { applyActions, emptySchema, parseCsv, type Schema } from "@schema-studio/core";
+import { applyActions, emptySchema, parseCsv, type Schema } from "@grafture/core";
 import { describe, expect, it } from "vitest";
 
 import { LocalBrowserProvider } from "../src/ai/LocalBrowserProvider.js";
@@ -26,7 +26,7 @@ import { summarizeAppliedActions } from "../src/copilot/formatActions.js";
  *
  * Run (from repo root):
  *   LOCAL_MODELS="qwen2.5:7b,qwen2.5:14b" \
- *     pnpm --filter @schema-studio/web exec vitest run test/evals.local.test.ts
+ *     pnpm --filter @grafture/web exec vitest run test/evals.local.test.ts
  *
  * Optional env:
  *   LOCAL_ENDPOINT   OpenAI-compatible base URL (default http://localhost:11434/v1)

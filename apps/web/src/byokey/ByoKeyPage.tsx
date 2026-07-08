@@ -110,7 +110,7 @@ export function ByoKeyPage({ onClose }: { onClose: () => void }) {
         <span className="byok__logo" aria-hidden>
           <DatabaseIcon size={14} />
         </span>
-        <span className="byok__wordmark">Schema Studio</span>
+        <span className="byok__wordmark">Grafture</span>
       </header>
 
       <main className="byok__body">
@@ -123,8 +123,8 @@ export function ByoKeyPage({ onClose }: { onClose: () => void }) {
               Connect your AI provider
             </h1>
             <p className="byok__subtitle">
-              Schema Studio uses your own API key to reason over sample values and propose joins.
-              Bring a key from any supported provider.
+              Grafture uses your own API key to reason over sample values and propose joins. Bring a
+              key from any supported provider.
             </p>
           </div>
 
@@ -232,7 +232,7 @@ export function ByoKeyPage({ onClose }: { onClose: () => void }) {
                 Your {credential.noun} is stored{" "}
                 {remember ? "locally in this browser" : "in memory for this session"} and used to
                 call the {credential.secret ? "provider" : "server"} directly. It never passes
-                through Schema Studio&apos;s servers — files are parsed locally too.
+                through Grafture&apos;s servers — files are parsed locally too.
               </span>
             </div>
           </div>
