@@ -99,7 +99,7 @@ const MAX_COMPOSITE_KEY_FINDINGS = 6;
 const MAX_FUNCTIONAL_DEPENDENCY_FINDINGS = 6;
 
 /**
- * Deterministic, content-aware findings from the core detectors (SS-9). Feeding these into the
+ * Deterministic, content-aware findings from the core detectors (GF-9). Feeding these into the
  * prompt lets the model reason from *computed evidence* — value overlap, inferred grain,
  * normalize-before-join warnings, primary-key candidates — instead of eyeballing raw samples.
  * Returns null when there is nothing to report (single source, no stats) so the section is omitted.

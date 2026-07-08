@@ -11,7 +11,7 @@ import { detectJoinKeys, detectPrimaryKeys } from "@grafture/core";
 import { tableNameFromFilename } from "../sources/tableName.js";
 
 /**
- * SS-9b — surface the core content-aware detectors (SS-9) as reviewable suggestions.
+ * GF-9b — surface the core content-aware detectors (GF-9) as reviewable suggestions.
  *
  * `detectJoinKeys` reasons over the *sample values* captured at parse time (not column
  * names) to propose cross-source join keys and flag identifier columns that won't match
@@ -193,7 +193,7 @@ export function buildApplyPlan(
 }
 
 /* --------------------------------------------------------------------------------------------
- * Primary-key suggestions (SS-9): a column that the *data* shows is unique and non-null is a
+ * Primary-key suggestions (GF-9): a column that the *data* shows is unique and non-null is a
  * key candidate. We only surface candidates whose table already exists on the canvas, so the
  * apply is a single `set_pk` through the validated path. Build the table first (e.g. via a join
  * suggestion or "Build table") and the key suggestion appears.
@@ -262,7 +262,7 @@ export function buildSetPkPlan(suggestion: KeySuggestion): { actions: unknown[] 
 }
 
 /* --------------------------------------------------------------------------------------------
- * Column type suggestions (SS-9): the parser infers a type from each source column's values. A
+ * Column type suggestions (GF-9): the parser infers a type from each source column's values. A
  * field on the canvas whose type disagrees with that inference is a refinement candidate — most
  * commonly an AI- or hand-added field left as the "text" default whose data is actually numeric.
  * Tables built from a source already carry the inferred type, so those never appear here. Applied

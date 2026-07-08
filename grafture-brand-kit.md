@@ -235,7 +235,7 @@ the user reads color/icon, not layout, to tell them apart.
   style and require the action name to literally appear in the body copy ("Delete
   `organizations`? This can't be undone.") — no generic "Are you sure?"
 
-### 5.4 Suggestion cards (joins, keys, types — the SS-9 detector output)
+### 5.4 Suggestion cards (joins, keys, types — the GF-9 detector output)
 
 This is the component family most specific to this product, so it gets its own
 treatment rather than reusing a generic "card."

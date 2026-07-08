@@ -2,13 +2,13 @@ import type { FieldStats, Source, SourceField } from "../parse/types.js";
 import { collectStats, isNullToken } from "../parse/sample.js";
 
 /**
- * Content-aware modeling primitives (SS-9). These are pure, deterministic functions
+ * Content-aware modeling primitives (GF-9). These are pure, deterministic functions
  * that reason over the *sample values* captured during parsing — not just column
  * names — to propose join keys and flag identifier columns that won't match without
  * normalization (e.g. HRSA's zero-padded "01234" vs OPAIS's "1234").
  *
  * They emit structured findings only; surfacing them as reviewable suggestions and
- * applying them through `applyActions` is the consumer's job (the copilot, SS-6).
+ * applying them through `applyActions` is the consumer's job (the copilot, GF-6).
  */
 
 export type FieldRef = {
