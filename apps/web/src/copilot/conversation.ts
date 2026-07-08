@@ -1,4 +1,4 @@
-import type { ConversationTurn } from "@schema-studio/core";
+import type { ConversationTurn } from "@grafture/core";
 
 import type { ChatMessage } from "./messages.js";
 

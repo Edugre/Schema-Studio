@@ -1,4 +1,4 @@
-import type { Schema, Source } from "@schema-studio/core";
+import type { Schema, Source } from "@grafture/core";
 
 export type Selection = {
   tableId?: string;

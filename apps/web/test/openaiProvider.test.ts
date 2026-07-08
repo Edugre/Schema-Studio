@@ -1,4 +1,4 @@
-import type { Schema } from "@schema-studio/core";
+import type { Schema } from "@grafture/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { OpenAiBrowserProvider, toOpenAiTool } from "../src/ai/OpenAiBrowserProvider.js";

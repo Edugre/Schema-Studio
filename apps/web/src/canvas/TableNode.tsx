@@ -1,4 +1,4 @@
-import type { Field, Table } from "@schema-studio/core";
+import type { Field, Table } from "@grafture/core";
 import { Handle, NodeResizeControl, Position } from "@xyflow/react";
 import type { Node, NodeProps } from "@xyflow/react";
 import { useState } from "react";

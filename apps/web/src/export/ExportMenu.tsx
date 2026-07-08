@@ -1,5 +1,5 @@
-import type { Schema } from "@schema-studio/core";
-import { toDbml, toPrisma, toSql } from "@schema-studio/core";
+import type { Schema } from "@grafture/core";
+import { toDbml, toPrisma, toSql } from "@grafture/core";
 import { useMemo, useState } from "react";
 
 import { useSchemaStore } from "../store/index.js";

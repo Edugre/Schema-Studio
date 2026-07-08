@@ -1,5 +1,5 @@
-import type { Schema, Source } from "@schema-studio/core";
-import { SchemaSchema, SourceSchema } from "@schema-studio/core";
+import type { Schema, Source } from "@grafture/core";
+import { SchemaSchema, SourceSchema } from "@grafture/core";
 
 import { type ChatMessage, ChatMessageSchema } from "../copilot/messages.js";
 import {
@@ -131,7 +131,7 @@ export function parseProjectFile(text: string): ParseProjectResult {
 
   const obj = json as Record<string, unknown>;
   if (obj["kind"] !== PROJECT_FILE_KIND) {
-    return { ok: false, error: "Not a Schema Studio project file." };
+    return { ok: false, error: "Not a Grafture project file." };
   }
 
   const contents = parseProjectContents(obj["schema"], obj["sources"], obj["chat"]);

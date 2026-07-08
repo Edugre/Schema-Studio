@@ -1,11 +1,11 @@
 {
-  "name": "schema-studio",
+  "name": "grafture",
   "private": true,
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "dev": "pnpm --filter @schema-studio/web dev",
-    "build": "pnpm --filter @schema-studio/core build && pnpm --filter @schema-studio/web build",
+    "dev": "pnpm --filter @grafture/web dev",
+    "build": "pnpm --filter @grafture/core build && pnpm --filter @grafture/web build",
     "test": "pnpm -r test",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write ."

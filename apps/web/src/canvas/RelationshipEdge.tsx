@@ -1,4 +1,4 @@
-import type { Cardinality } from "@schema-studio/core";
+import type { Cardinality } from "@grafture/core";
 import { BaseEdge, EdgeLabelRenderer, getSmoothStepPath } from "@xyflow/react";
 import type { Edge, EdgeProps } from "@xyflow/react";
 

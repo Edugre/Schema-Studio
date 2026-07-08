@@ -7,7 +7,7 @@
     "moduleResolution": "bundler",
     "types": ["vite/client"],
     "paths": {
-      "@schema-studio/core": ["../../packages/core/src/index.ts"]
+      "@grafture/core": ["../../packages/core/src/index.ts"]
     }
   },
   "include": ["src", "test", "vite.config.ts", "vitest.config.ts"]

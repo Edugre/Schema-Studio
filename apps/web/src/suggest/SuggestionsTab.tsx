@@ -10,7 +10,7 @@ import "./SuggestionsTab.css";
 type RankInfo = { order: number; rationale?: string; priority?: "high" | "normal" | "low" };
 
 /**
- * SS-9 suggestions as the Copilot pane's "Suggestions" tab. Cards are a single-open accordion
+ * GF-9 suggestions as the Copilot pane's "Suggestions" tab. Cards are a single-open accordion
  * (handoff: design_handoff_active_suggestion_preview): collapsed to one line by default, expanding
  * to reveal stats + Apply/Dismiss. The open card is the `active` suggestion — lifted to App and
  * shared with the canvas, which dims the schema and previews the proposed key/relationship.

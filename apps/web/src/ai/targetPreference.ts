@@ -1,4 +1,4 @@
-import { DEFAULT_TARGET, TargetIdSchema, type TargetId } from "@schema-studio/core";
+import { DEFAULT_TARGET, TargetIdSchema, type TargetId } from "@grafture/core";
 import { useCallback, useEffect, useState } from "react";
 
 /**
@@ -10,8 +10,8 @@ import { useCallback, useEffect, useState } from "react";
  * sync; the native `storage` event covers other tabs.
  */
 
-const STORAGE_KEY = "schema-studio:target";
-const CHANGE_EVENT = "schema-studio:target-change";
+const STORAGE_KEY = "grafture:target";
+const CHANGE_EVENT = "grafture:target-change";
 
 export function readTargetPreference(): TargetId {
   try {

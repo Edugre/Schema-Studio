@@ -1,5 +1,5 @@
-import type { ApplyResult, Cardinality, Field, Schema, Source, Table } from "@schema-studio/core";
-import { SchemaSchema, applyActions, emptySchema } from "@schema-studio/core";
+import type { ApplyResult, Cardinality, Field, Schema, Source, Table } from "@grafture/core";
+import { SchemaSchema, applyActions, emptySchema } from "@grafture/core";
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 

@@ -64,7 +64,7 @@ function isNonEmpty(value: string | null | undefined): value is string {
 
 /**
  * Distinct / non-empty / blank counts over the scanned rows (up to MAX_SCAN_ROWS, sampled
- * evenly across the file by the parsers via `sampleScanRows`). Used by the SS-9 detectors to
+ * evenly across the file by the parsers via `sampleScanRows`). Used by the GF-9 detectors to
  * reason about uniqueness (PK candidates) and join grain. Unlike `collectSamples`, this scans
  * every value in the window — uniqueness needs the full count, not just the first 5 distinct
  * samples.

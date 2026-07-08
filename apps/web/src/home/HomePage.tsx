@@ -1,4 +1,4 @@
-import { fromSql, ParseError } from "@schema-studio/core";
+import { fromSql, ParseError } from "@grafture/core";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useProjectsContext } from "../persistence/index.js";
@@ -188,7 +188,7 @@ export function HomePage({
           <span className="home-topbar__logo" aria-hidden>
             <DatabaseIcon size={14} />
           </span>
-          <span className="home-topbar__wordmark">Schema Studio</span>
+          <span className="home-topbar__wordmark">Grafture</span>
         </div>
         <div className="home-topbar__right">
           <button

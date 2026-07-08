@@ -1,4 +1,4 @@
-import type { SuggestionRanking } from "@schema-studio/core";
+import type { SuggestionRanking } from "@grafture/core";
 import { describe, expect, it } from "vitest";
 
 import { mergeRankings, parseRankingResponse, toDigest } from "../src/suggest/rerank.js";

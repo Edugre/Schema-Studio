@@ -1,4 +1,4 @@
-import { emptySchema } from "@schema-studio/core";
+import { emptySchema } from "@grafture/core";
 import { describe, expect, it, vi } from "vitest";
 
 import { buildTableFromSource } from "../src/sources/buildFromSource.js";

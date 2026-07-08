@@ -26,7 +26,7 @@ export function TopBar({
           <span className="topbar__logo" aria-hidden>
             <DatabaseIcon size={14} />
           </span>
-          <span className="topbar__wordmark">Schema Studio</span>
+          <span className="topbar__wordmark">Grafture</span>
         </button>
       </div>
 

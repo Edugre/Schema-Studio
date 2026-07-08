@@ -1,4 +1,4 @@
-import { DEFAULT_TARGET, type TargetId } from "@schema-studio/core";
+import { DEFAULT_TARGET, type TargetId } from "@grafture/core";
 
 import { OpenAiCompatibleProvider } from "./openaiCompatible.js";
 import { LOCAL_DEFAULT_ENDPOINT, parseLocalModels } from "./localModels.js";

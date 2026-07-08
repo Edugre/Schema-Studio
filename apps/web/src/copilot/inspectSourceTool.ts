@@ -1,4 +1,4 @@
-import type { Source } from "@schema-studio/core";
+import type { Source } from "@grafture/core";
 
 /** Cap on values returned per call — enough to judge a column, bounded for the context window. */
 const MAX_INSPECT_VALUES = 100;

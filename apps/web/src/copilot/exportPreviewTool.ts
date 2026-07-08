@@ -1,4 +1,4 @@
-import { applyActions, toDbml, toPrisma, toSql, type Schema } from "@schema-studio/core";
+import { applyActions, toDbml, toPrisma, toSql, type Schema } from "@grafture/core";
 
 /**
  * A read-only tool the copilot can call mid-turn to see the migration its design would generate,

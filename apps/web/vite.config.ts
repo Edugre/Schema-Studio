@@ -10,7 +10,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      "@schema-studio/core": path.resolve(rootDir, "../../packages/core/src/index.ts"),
+      "@grafture/core": path.resolve(rootDir, "../../packages/core/src/index.ts"),
     },
   },
   server: {

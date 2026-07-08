@@ -1,4 +1,4 @@
-import type { Schema, Source } from "@schema-studio/core";
+import type { Schema, Source } from "@grafture/core";
 
 import type { ChatMessage } from "../copilot/messages.js";
 
@@ -49,7 +49,7 @@ export interface KeyValueStore {
 }
 
 /** Marker + version for the import/export file format. */
-export const PROJECT_FILE_KIND = "schema-studio/project";
+export const PROJECT_FILE_KIND = "grafture/project";
 // v2 adds `chat`. v1 files (no chat) still import — chat defaults to [].
 export const PROJECT_FILE_VERSION = 2;
 

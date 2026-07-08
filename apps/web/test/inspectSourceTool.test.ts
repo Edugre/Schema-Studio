@@ -1,4 +1,4 @@
-import type { Source } from "@schema-studio/core";
+import type { Source } from "@grafture/core";
 import { describe, expect, it } from "vitest";
 
 import { runInspectSource } from "../src/copilot/inspectSourceTool.js";

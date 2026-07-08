@@ -1,4 +1,4 @@
-import type { SourceKind } from "@schema-studio/core";
+import type { SourceKind } from "@grafture/core";
 
 export function detectSourceKind(filename: string): SourceKind | null {
   const lower = filename.toLowerCase();

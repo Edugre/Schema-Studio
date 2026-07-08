@@ -1,4 +1,4 @@
-import type { ModelInfo } from "@schema-studio/core";
+import type { ModelInfo } from "@grafture/core";
 
 import { parseOpenAiCompatibleModels } from "./openaiModels.js";
 

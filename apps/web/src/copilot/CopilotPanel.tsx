@@ -1,5 +1,5 @@
-import { applyActions } from "@schema-studio/core";
-import type { Schema } from "@schema-studio/core";
+import { applyActions } from "@grafture/core";
+import type { Schema } from "@grafture/core";
 import { useEffect, useRef, useState } from "react";
 
 import { useAiProvider } from "../ai/useAiProvider.js";

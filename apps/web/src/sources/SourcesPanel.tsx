@@ -1,4 +1,4 @@
-import { ParseError } from "@schema-studio/core";
+import { ParseError } from "@grafture/core";
 import { useCallback, useRef, useState, type DragEvent, type ReactNode } from "react";
 
 import { useSchemaStore } from "../store/index.js";

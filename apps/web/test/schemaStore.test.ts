@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { Source } from "@schema-studio/core";
-import { emptySchema } from "@schema-studio/core";
+import type { Source } from "@grafture/core";
+import { emptySchema } from "@grafture/core";
 
 import { createSchemaStore } from "../src/store/schemaStore.js";
 import { HISTORY_LIMIT, createHistoryController, pushHistory } from "../src/store/history.js";

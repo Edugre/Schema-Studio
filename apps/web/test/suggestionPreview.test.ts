@@ -1,4 +1,4 @@
-import type { Schema } from "@schema-studio/core";
+import type { Schema } from "@grafture/core";
 import { describe, expect, it } from "vitest";
 
 import {

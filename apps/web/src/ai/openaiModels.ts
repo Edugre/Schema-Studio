@@ -1,4 +1,4 @@
-import type { ModelInfo } from "@schema-studio/core";
+import type { ModelInfo } from "@grafture/core";
 
 /**
  * The OpenAI model used when no preference is saved. A capable, current chat model; the Settings

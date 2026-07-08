@@ -1,5 +1,5 @@
-import type { Schema, Source } from "@schema-studio/core";
-import { emptySchema } from "@schema-studio/core";
+import type { Schema, Source } from "@grafture/core";
+import { emptySchema } from "@grafture/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { ChatMessage } from "../copilot/messages.js";
@@ -312,7 +312,7 @@ export function useProjects(
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `${name.replace(/[^\w.-]+/g, "_") || "project"}.schemastudio.json`;
+    anchor.download = `${name.replace(/[^\w.-]+/g, "_") || "project"}.grafture.json`;
     anchor.click();
     URL.revokeObjectURL(url);
   }, [projects]);

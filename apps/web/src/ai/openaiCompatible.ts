@@ -8,7 +8,7 @@ import type {
   SuggestionDigest,
   SuggestionRanking,
   TargetId,
-} from "@schema-studio/core";
+} from "@grafture/core";
 
 import { buildCopilotSystemPrompt, buildRerankSystemPrompt } from "../copilot/systemPrompt.js";
 import { COPILOT_RESPONSE_TOOL, parseResponseArgs } from "../copilot/responseTool.js";

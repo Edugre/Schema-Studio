@@ -1,4 +1,4 @@
-import { SchemaActionSchema, emptySchema } from "@schema-studio/core";
+import { SchemaActionSchema, emptySchema } from "@grafture/core";
 import { describe, expect, it } from "vitest";
 
 import {

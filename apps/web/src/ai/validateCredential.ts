@@ -1,4 +1,4 @@
-import { DEFAULT_TARGET } from "@schema-studio/core";
+import { DEFAULT_TARGET } from "@grafture/core";
 
 import { PROVIDERS, type ProviderId } from "./providers.js";
 

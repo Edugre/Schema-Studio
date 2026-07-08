@@ -1,12 +1,12 @@
-# Schema Studio — Agent Guide
+# Grafture — Agent Guide
 
 ## What this is
 
-Schema Studio turns a pile of heterogeneous source files (CSV, Excel, JSON) into a
+Grafture turns a pile of heterogeneous source files (CSV, Excel, JSON) into a
 proposed, AI-reasoned relational schema, and exports real migrations from it.
 
 It is **not** "another ERD editor." Every mature tool in this space (ChartDB, DrawDB,
-Azimutt) starts from a database or a schema you already have. Schema Studio starts from
+Azimutt) starts from a database or a schema you already have. Grafture starts from
 raw data you need to _integrate_ and helps you derive the schema you don't have yet.
 
 The differentiator — protect it in every change — is **content-aware modeling**: the AI

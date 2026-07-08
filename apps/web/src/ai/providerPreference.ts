@@ -9,8 +9,8 @@ import { toProviderId, type ProviderId } from "./providers.js";
  * tabs.
  */
 
-const STORAGE_KEY = "schema-studio:provider";
-const CHANGE_EVENT = "schema-studio:provider-change";
+const STORAGE_KEY = "grafture:provider";
+const CHANGE_EVENT = "grafture:provider-change";
 
 export function readProviderPreference(): ProviderId {
   try {

@@ -1,4 +1,4 @@
-import { emptySchema, parseCsv } from "@schema-studio/core";
+import { emptySchema, parseCsv } from "@grafture/core";
 import { describe, expect, it } from "vitest";
 
 import { buildDynamicContext, buildStaticInstructions } from "../src/copilot/systemPrompt.js";

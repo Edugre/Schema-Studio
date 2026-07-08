@@ -1,6 +1,6 @@
-# Contributing to Schema Studio
+# Contributing to Grafture
 
-Thanks for helping build Schema Studio. This guide covers setup, the commands you'll run,
+Thanks for helping build Grafture. This guide covers setup, the commands you'll run,
 and the one architectural rule that keeps the project coherent.
 
 ## Setup

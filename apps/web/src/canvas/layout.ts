@@ -1,4 +1,4 @@
-import type { Schema } from "@schema-studio/core";
+import type { Schema } from "@grafture/core";
 import ELK from "elkjs/lib/elk.bundled.js";
 
 import { NODE_WIDTH, tableNodeHeight } from "./constants.js";

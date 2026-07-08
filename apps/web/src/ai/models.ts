@@ -1,4 +1,4 @@
-import type { ModelInfo } from "@schema-studio/core";
+import type { ModelInfo } from "@grafture/core";
 
 /**
  * The model used when no preference is saved. Kept at Sonnet 4.6 to preserve the app's original
