@@ -18,8 +18,15 @@ import { INSPECT_SOURCE_TOOL, runInspectSource } from "../copilot/inspectSourceT
 import { PROBE_JOIN_TOOL, runProbeJoin } from "../copilot/probeJoinTool.js";
 import { parseRankingResponse } from "../suggest/rerank.js";
 
-/** Cap on preview/inspect round-trips within a single propose() before we force a finalization. */
-const MAX_PREVIEW_ITERATIONS = 3;
+/** Cap on investigation round-trips within a single propose() before we force a finalization. */
+const MAX_PREVIEW_ITERATIONS = 6;
+/**
+ * On a fresh derivation (no history, sources present) `submit_schema_response` is withheld for
+ * this many inner rounds, so the model spends them on probe/inspect/preview evidence-gathering
+ * instead of finalizing from the prompt digest alone. Correction turns keep submit from round
+ * one — they already investigated.
+ */
+const INVESTIGATION_ROUNDS = 2;
 
 /**
  * Appended to the system prompt in JSON mode. The static prompt already defines every action op and
@@ -220,21 +227,25 @@ export class OpenAiCompatibleProvider implements AiProvider {
     message: string,
     history: ConversationTurn[],
   ): Promise<AiProviderResult> {
-    const tools = [
-      PREVIEW_EXPORT_TOOL,
-      INSPECT_SOURCE_TOOL,
-      PROBE_JOIN_TOOL,
-      COPILOT_RESPONSE_TOOL,
-    ].map(toOpenAiTool);
+    const investigationTools = [PREVIEW_EXPORT_TOOL, INSPECT_SOURCE_TOOL, PROBE_JOIN_TOOL];
     let messages: OpenAiMessage[] = [
       ...history.map((turn) => ({ role: turn.role, content: turn.content })),
       { role: "user", content: message },
     ];
+    // Fresh derivations get an evidence-gathering phase before submit is even offered;
+    // follow-up/correction turns (history present) or source-less questions do not.
+    const withheldRounds = history.length === 0 && sources.length > 0 ? INVESTIGATION_ROUNDS : 0;
 
-    // Agentic tool loop: the model may call preview_export or inspect_source (both read-only,
-    // in-memory) then finalize with submit_schema_response. `tool_choice: "required"` forces a
-    // tool call every step so the loop never dead-ends on a stray sentence.
+    // Agentic tool loop: the model may call preview_export, inspect_source, or probe_join (all
+    // read-only, in-memory) then finalize with submit_schema_response. `tool_choice: "required"`
+    // forces a tool call every step so the loop never dead-ends on a stray sentence. The tool
+    // list is built per round: submit is withheld while investigating.
     for (let iteration = 0; iteration < MAX_PREVIEW_ITERATIONS; iteration += 1) {
+      const tools = (
+        iteration < withheldRounds
+          ? investigationTools
+          : [...investigationTools, COPILOT_RESPONSE_TOOL]
+      ).map(toOpenAiTool);
       const data = await this.request(system, messages, tools, "required");
       const msg = data.choices?.[0]?.message;
       const toolCalls = msg?.tool_calls ?? [];
