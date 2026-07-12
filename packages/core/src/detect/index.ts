@@ -100,9 +100,19 @@ function fieldValues(field: SourceField): string[] {
   return field.distinctValues ?? field.samples;
 }
 
+/**
+ * The values join/containment detection compares: the wide join-discovery set when the upload
+ * session captured one (up to MAX_JOIN_VALUES distinct values over the whole file), else the
+ * ≤1000-value scan window. After a reload `joinValues` is gone (stripped from persistence), so
+ * detection degrades to the capped set until the file is re-uploaded.
+ */
+function joinFieldValues(field: SourceField): string[] {
+  return field.joinValues ?? field.distinctValues ?? field.samples;
+}
+
 function valueSet(field: SourceField, normalize: (value: string) => string): Set<string> {
   const set = new Set<string>();
-  for (const sample of fieldValues(field)) {
+  for (const sample of joinFieldValues(field)) {
     const normalized = normalize(sample);
     if (normalized !== "") {
       set.add(normalized);

@@ -58,6 +58,15 @@ export const SourceFieldSchema = z.object({
    * real files. Optional: older persisted sources fall back to `samples`.
    */
   distinctValues: z.array(z.string()).optional(),
+  /**
+   * The wide join-discovery value set: distinct non-empty values over the WHOLE file (capped
+   * only by the MAX_JOIN_VALUES memory ceiling), collected by a second, wider parser pass.
+   * Join/containment detection prefers this over `distinctValues`, whose ≤1000-value sample
+   * badly understates overlap between large files. In-memory only: the persistence layer
+   * strips it before every write (like `sampleRows` in exports), so after a reload detection
+   * falls back to `distinctValues` until the file is re-uploaded.
+   */
+  joinValues: z.array(z.string()).optional(),
 });
 export type SourceField = z.infer<typeof SourceFieldSchema>;
 
