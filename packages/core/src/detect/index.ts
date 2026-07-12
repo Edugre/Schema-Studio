@@ -43,6 +43,15 @@ export type JoinKeyCandidate = {
   normalizedOverlap: number;
   /** Count of sample values shared after normalization. */
   sharedValues: number;
+  /**
+   * Share of the LEFT side's distinct values found on the right, [0, 1]. A real foreign key is
+   * a *subset* relationship — the child's keys are contained in the parent's while the parent
+   * has many more — so high one-way containment with low symmetric Jaccard is exactly the FK
+   * shape. `containmentLeft ≈ 1` reads "left ⊆ right ⇒ left is the FK side".
+   */
+  containmentLeft: number;
+  /** Share of the RIGHT side's distinct values found on the left, [0, 1]. */
+  containmentRight: number;
   /** True when normalization meaningfully increases the overlap. */
   requiresNormalization: boolean;
   formatMismatch: FormatMismatch | null;
@@ -71,12 +80,21 @@ const MIN_STATS_ROWS = 4;
 export type DetectOptions = {
   /** Minimum normalized Jaccard overlap to propose a join. Default 0.3. */
   minOverlap?: number;
-  /** Minimum number of shared normalized values. Default 2. */
+  /** Minimum number of shared normalized values (Jaccard path only). Default 2. */
   minSharedValues?: number;
+  /** Minimum one-way containment for the FK-shaped path. Default 0.4. */
+  minContainment?: number;
 };
 
 const DEFAULT_MIN_OVERLAP = 0.3;
 const DEFAULT_MIN_SHARED = 2;
+/**
+ * Containment gate for the FK-shaped path. Deliberately below 0.5: the flagship real-world
+ * bridge (OPAIS npiNumbers → HRSA site NPI) sits near ~53% full-file containment and sampling
+ * only ever lowers the observed figure, so a 0.5 gate would suppress the exact FK the
+ * containment path exists to surface. `probe_join` is the escape hatch for anything below.
+ */
+const DEFAULT_MIN_CONTAINMENT = 0.4;
 const NORMALIZATION_EPSILON = 0.05;
 
 function stripLeadingZeros(value: string): string {
@@ -840,6 +858,20 @@ export function detectSemanticTypes(
   return findings;
 }
 
+/**
+ * The stronger of a candidate's two signals: for a symmetric join max-containment ≥ Jaccard
+ * anyway, and for the FK shape it is the containment figure — not the diluted Jaccard — that
+ * measures how real the link is. Without this, a containment-admitted FK would sort by its
+ * (low) Jaccard and get evicted from the consumers' top-N slices.
+ */
+function candidateStrength(candidate: JoinKeyCandidate): number {
+  return Math.max(
+    candidate.normalizedOverlap,
+    candidate.containmentLeft,
+    candidate.containmentRight,
+  );
+}
+
 function compareRefs(a: FieldRef, b: FieldRef): number {
   return (
     a.sourceId.localeCompare(b.sourceId) ||
@@ -856,6 +888,7 @@ function compareRefs(a: FieldRef, b: FieldRef): number {
 export function detectJoinKeys(sources: Source[], options?: DetectOptions): JoinKeyCandidate[] {
   const minOverlap = options?.minOverlap ?? DEFAULT_MIN_OVERLAP;
   const minShared = options?.minSharedValues ?? DEFAULT_MIN_SHARED;
+  const minContainment = options?.minContainment ?? DEFAULT_MIN_CONTAINMENT;
 
   const candidates: JoinKeyCandidate[] = [];
 
@@ -891,8 +924,23 @@ export function detectJoinKeys(sources: Source[], options?: DetectOptions): Join
           const rawOverlap = jaccard(left.raw, right.raw);
           const sharedValues = intersectionSize(left.full, right.full);
           const normalizedOverlap = jaccard(left.full, right.full);
+          const containmentLeft = left.full.size === 0 ? 0 : sharedValues / left.full.size;
+          const containmentRight = right.full.size === 0 ? 0 : sharedValues / right.full.size;
 
-          if (normalizedOverlap < minOverlap || sharedValues < minShared) {
+          // Two admission paths. Jaccard catches symmetric overlap; containment catches the
+          // FK *subset* shape (child ⊆ large parent) that symmetric Jaccard averages away.
+          // The containment path needs its own guard — `minShared` does not stop enums: a
+          // 3-value enum fully present in a large column has containment 1.0 and 3 shared
+          // values. Only let it fire when the contained (smaller) side is NOT itself a closed
+          // value set (more distinct values than the value-set cardinality ceiling). Known
+          // trade: a real FK into a ≤12-key dimension must surface via the Jaccard path.
+          const jaccardPass = normalizedOverlap >= minOverlap && sharedValues >= minShared;
+          const containedSideDistinct =
+            containmentLeft >= containmentRight ? left.full.size : right.full.size;
+          const containmentPass =
+            Math.max(containmentLeft, containmentRight) >= minContainment &&
+            containedSideDistinct > DEFAULT_MAX_DISTINCT;
+          if (!jaccardPass && !containmentPass) {
             continue;
           }
 
@@ -912,6 +960,8 @@ export function detectJoinKeys(sources: Source[], options?: DetectOptions): Join
             rawOverlap,
             normalizedOverlap,
             sharedValues,
+            containmentLeft,
+            containmentRight,
             requiresNormalization:
               normalizedOverlap - rawOverlap > NORMALIZATION_EPSILON || formatMismatch !== null,
             formatMismatch,
@@ -924,6 +974,7 @@ export function detectJoinKeys(sources: Source[], options?: DetectOptions): Join
 
   candidates.sort(
     (a, b) =>
+      candidateStrength(b) - candidateStrength(a) ||
       b.normalizedOverlap - a.normalizedOverlap ||
       b.sharedValues - a.sharedValues ||
       compareRefs(a.left, b.left) ||

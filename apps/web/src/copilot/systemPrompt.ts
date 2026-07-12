@@ -125,6 +125,10 @@ function summarizeDetectorFindings(sources: Source[]) {
       left: `${candidate.left.sourceName}.${candidate.left.field}`,
       right: `${candidate.right.sourceName}.${candidate.right.field}`,
       overlap: `${Math.round(candidate.normalizedOverlap * 100)}%`,
+      // Directional subset evidence: containment_left ≈ 100% reads "left ⊆ right ⇒ left is
+      // the FK side" even when symmetric overlap is low (the classic FK-into-dimension shape).
+      containment_left: `${Math.round(candidate.containmentLeft * 100)}%`,
+      containment_right: `${Math.round(candidate.containmentRight * 100)}%`,
       grain: candidate.grain,
       normalize: candidate.formatMismatch ? candidate.formatMismatch.note : null,
     }));
