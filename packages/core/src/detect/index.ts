@@ -885,6 +885,106 @@ function compareRefs(a: FieldRef, b: FieldRef): number {
  * fields from *different* sources; a pair is a candidate when its normalized overlap
  * and shared-value count clear the thresholds. Output is sorted deterministically.
  */
+export type ProbeJoinRef = { source: string; field: string };
+
+export type ProbeJoinResult =
+  | {
+      ok: true;
+      /** Distinct normalized values shared by the two columns. */
+      shared: number;
+      /** Distinct normalized values on each side (over the widest captured set). */
+      leftDistinct: number;
+      rightDistinct: number;
+      /** Jaccard overlap of raw (un-normalized) values, [0, 1]. */
+      rawOverlap: number;
+      /** Jaccard overlap after normalization, [0, 1]. */
+      normalizedOverlap: number;
+      /** Share of each side's values found on the other, [0, 1]. High one-way = FK shape. */
+      containmentLeft: number;
+      containmentRight: number;
+      grain: Grain;
+      formatMismatch: FormatMismatch | null;
+      /**
+       * False when a side lost its wide join set (e.g. after a project reload) and the probe
+       * ran over the ≤1000-value scan window — figures are then lower bounds; re-upload the
+       * file for full fidelity.
+       */
+      leftFullFidelity: boolean;
+      rightFullFidelity: boolean;
+    }
+  | { ok: false; error: string };
+
+/** Resolve a probe ref against the loaded sources, reporting valid names on a miss. */
+function resolveProbeRef(
+  sources: Source[],
+  ref: ProbeJoinRef,
+): { field: SourceField; source: Source } | { error: string } {
+  const source = sources.find((candidate) => candidate.name === ref.source);
+  if (!source) {
+    const names = sources.map((candidate) => candidate.name).join(", ");
+    return { error: `no source named "${ref.source}". Available sources: ${names || "(none)"}.` };
+  }
+  const field = source.fields.find((candidate) => candidate.name === ref.field);
+  if (!field) {
+    const names = source.fields.map((candidate) => candidate.name).join(", ");
+    return {
+      error: `no field named "${ref.field}" in ${source.name}. Available fields: ${names || "(none)"}.`,
+    };
+  }
+  return { field, source };
+}
+
+/** Is this field's probe running over the full file, or a capped fallback window? */
+function hasFullFidelity(source: Source, field: SourceField): boolean {
+  if (field.joinValues) {
+    return true;
+  }
+  // Without a wide set, fidelity holds only when the file never exceeded the scan window.
+  return source.rowCount !== undefined && source.rowCount <= (field.distinctValues ?? []).length;
+}
+
+/**
+ * Probe an arbitrary field pair for join evidence, on demand (GF: the copilot's `probe_join`
+ * tool). Unlike `detectJoinKeys` — a thresholded global top-N — this computes live overlap,
+ * containment, grain, and format-mismatch for exactly the pair the caller hypothesizes, with
+ * no admission gate: near-zero figures are the point when rejecting a look-alike join. Pure
+ * and read-only, computed over the widest captured value sets (`joinValues ?? distinctValues`).
+ */
+export function probeJoin(
+  sources: Source[],
+  input: { left: ProbeJoinRef; right: ProbeJoinRef },
+): ProbeJoinResult {
+  const left = resolveProbeRef(sources, input.left);
+  if ("error" in left) {
+    return { ok: false, error: `left: ${left.error}` };
+  }
+  const right = resolveProbeRef(sources, input.right);
+  if ("error" in right) {
+    return { ok: false, error: `right: ${right.error}` };
+  }
+
+  const leftRaw = valueSet(left.field, NORMALIZERS.raw);
+  const rightRaw = valueSet(right.field, NORMALIZERS.raw);
+  const leftFull = valueSet(left.field, NORMALIZERS.full);
+  const rightFull = valueSet(right.field, NORMALIZERS.full);
+  const shared = intersectionSize(leftFull, rightFull);
+
+  return {
+    ok: true,
+    shared,
+    leftDistinct: leftFull.size,
+    rightDistinct: rightFull.size,
+    rawOverlap: jaccard(leftRaw, rightRaw),
+    normalizedOverlap: jaccard(leftFull, rightFull),
+    containmentLeft: leftFull.size === 0 ? 0 : shared / leftFull.size,
+    containmentRight: rightFull.size === 0 ? 0 : shared / rightFull.size,
+    grain: inferGrain(left.field, right.field),
+    formatMismatch: detectFormatMismatch(left.field, right.field),
+    leftFullFidelity: hasFullFidelity(left.source, left.field),
+    rightFullFidelity: hasFullFidelity(right.source, right.field),
+  };
+}
+
 export function detectJoinKeys(sources: Source[], options?: DetectOptions): JoinKeyCandidate[] {
   const minOverlap = options?.minOverlap ?? DEFAULT_MIN_OVERLAP;
   const minShared = options?.minSharedValues ?? DEFAULT_MIN_SHARED;

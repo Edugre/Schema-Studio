@@ -14,6 +14,7 @@ import {
 import { COPILOT_RESPONSE_TOOL } from "./responseTool.js";
 import { PREVIEW_EXPORT_TOOL } from "./exportPreviewTool.js";
 import { INSPECT_SOURCE_TOOL } from "./inspectSourceTool.js";
+import { PROBE_JOIN_TOOL } from "./probeJoinTool.js";
 
 function summarizeSchema(schema: Schema) {
   const tableById = new Map(schema.tables.map((table) => [table.id, table]));
@@ -282,6 +283,11 @@ export function buildStaticInstructions(targetId: TargetId = DEFAULT_TARGET): st
     `When the sample values in <sources> are not enough to decide a type, key, or normalization`,
     `question, call the ${INSPECT_SOURCE_TOOL.name} tool to see a column's stats and more of its`,
     "distinct values before guessing.",
+    "",
+    `When you hypothesize a join the <detector_findings> do not list — or doubt one they do —`,
+    `call the ${PROBE_JOIN_TOOL.name} tool to measure the pair's live overlap, containment, grain,`,
+    "and normalization needs. Verify joins with evidence instead of assuming them from column",
+    "names; near-zero containment is a reason to REJECT a look-alike join and say so.",
     "",
     `Return your final response by calling the ${COPILOT_RESPONSE_TOOL.name} tool — put your`,
     'explanation in "reply", the schema actions in "actions" (empty for a plain question), and set',

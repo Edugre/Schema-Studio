@@ -15,6 +15,7 @@ import { COPILOT_RESPONSE_TOOL, parseResponseArgs } from "../copilot/responseToo
 import { parseCopilotResponse } from "../copilot/parseResponse.js";
 import { PREVIEW_EXPORT_TOOL, runExportPreview } from "../copilot/exportPreviewTool.js";
 import { INSPECT_SOURCE_TOOL, runInspectSource } from "../copilot/inspectSourceTool.js";
+import { PROBE_JOIN_TOOL, runProbeJoin } from "../copilot/probeJoinTool.js";
 import { parseRankingResponse } from "../suggest/rerank.js";
 
 /** Cap on preview/inspect round-trips within a single propose() before we force a finalization. */
@@ -219,9 +220,12 @@ export class OpenAiCompatibleProvider implements AiProvider {
     message: string,
     history: ConversationTurn[],
   ): Promise<AiProviderResult> {
-    const tools = [PREVIEW_EXPORT_TOOL, INSPECT_SOURCE_TOOL, COPILOT_RESPONSE_TOOL].map(
-      toOpenAiTool,
-    );
+    const tools = [
+      PREVIEW_EXPORT_TOOL,
+      INSPECT_SOURCE_TOOL,
+      PROBE_JOIN_TOOL,
+      COPILOT_RESPONSE_TOOL,
+    ].map(toOpenAiTool);
     let messages: OpenAiMessage[] = [
       ...history.map((turn) => ({ role: turn.role, content: turn.content })),
       { role: "user", content: message },
@@ -300,6 +304,9 @@ export class OpenAiCompatibleProvider implements AiProvider {
     }
     if (call.function.name === INSPECT_SOURCE_TOOL.name) {
       return runInspectSource(sources, args);
+    }
+    if (call.function.name === PROBE_JOIN_TOOL.name) {
+      return runProbeJoin(sources, args);
     }
     return `error: unknown tool "${call.function.name}".`;
   }

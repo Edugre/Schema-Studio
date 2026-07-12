@@ -19,6 +19,7 @@ import {
 import { COPILOT_RESPONSE_TOOL, parseToolUseResponse } from "../copilot/responseTool.js";
 import { PREVIEW_EXPORT_TOOL, runExportPreview } from "../copilot/exportPreviewTool.js";
 import { INSPECT_SOURCE_TOOL, runInspectSource } from "../copilot/inspectSourceTool.js";
+import { PROBE_JOIN_TOOL, runProbeJoin } from "../copilot/probeJoinTool.js";
 import { parseRankingResponse } from "../suggest/rerank.js";
 import { DEFAULT_MODEL, parseModelsPage } from "./models.js";
 
@@ -81,7 +82,12 @@ export class AnthropicBrowserProvider implements AiProvider {
       },
       { type: "text", text: buildDynamicContext(schema, sources) },
     ];
-    const tools = [PREVIEW_EXPORT_TOOL, INSPECT_SOURCE_TOOL, COPILOT_RESPONSE_TOOL];
+    const tools = [
+      PREVIEW_EXPORT_TOOL,
+      INSPECT_SOURCE_TOOL,
+      PROBE_JOIN_TOOL,
+      COPILOT_RESPONSE_TOOL,
+    ];
     let messages: ProviderMessage[] = [...history, { role: "user", content: message }];
 
     // Agentic tool loop: the model may call preview_export (see the migration its design would
@@ -97,7 +103,9 @@ export class AnthropicBrowserProvider implements AiProvider {
 
       const calls = data.content.filter(
         (block) =>
-          isToolUse(block, PREVIEW_EXPORT_TOOL.name) || isToolUse(block, INSPECT_SOURCE_TOOL.name),
+          isToolUse(block, PREVIEW_EXPORT_TOOL.name) ||
+          isToolUse(block, INSPECT_SOURCE_TOOL.name) ||
+          isToolUse(block, PROBE_JOIN_TOOL.name),
       );
       if (calls.length === 0) {
         // No recognized tool — parse whatever came back (text fallback) or surface it as blocked.
@@ -112,7 +120,9 @@ export class AnthropicBrowserProvider implements AiProvider {
         content:
           call.name === PREVIEW_EXPORT_TOOL.name
             ? runExportPreview(schema, call.input)
-            : runInspectSource(sources, call.input),
+            : call.name === PROBE_JOIN_TOOL.name
+              ? runProbeJoin(sources, call.input)
+              : runInspectSource(sources, call.input),
       }));
       messages = [
         ...messages,

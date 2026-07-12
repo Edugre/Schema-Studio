@@ -22,6 +22,8 @@ export type {
   JoinKeyCandidate,
   PrimaryKeyCandidate,
   PrimaryKeyOptions,
+  ProbeJoinRef,
+  ProbeJoinResult,
   SemanticType,
   SemanticTypeFinding,
   SemanticTypeOptions,
@@ -38,6 +40,7 @@ export {
   detectSemanticTypes,
   detectValueSets,
   inferGrain,
+  probeJoin,
 } from "./detect/index.js";
 export type { SqlDialect } from "./export/index.js";
 export { toDbml, toPrisma, toSql } from "./export/index.js";
