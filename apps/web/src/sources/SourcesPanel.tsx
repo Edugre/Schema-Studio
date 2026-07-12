@@ -181,7 +181,7 @@ export function SourcesPanel({
       return;
     }
 
-    const result = buildTableFromSource(runActions, schema, source);
+    const result = buildTableFromSource(runActions, schema, source, sources);
 
     if (result.rejected.length > 0) {
       setMessage({ kind: "error", text: rejectionSummary(result.rejected) });

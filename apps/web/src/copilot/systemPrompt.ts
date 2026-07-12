@@ -219,7 +219,14 @@ const DESIGN_DOCTRINE = `How to design the schema — model entities, not files:
     carries its own attributes or needs referential integrity; otherwise keep it inline and say why.
   - A group of columns that repeats as a unit (address blocks, contact info) becomes its own table
     when it has independent identity or is shared across rows.
-  - An N:M relationship needs a junction table; neither side holds the other's key.
+  - An N:M relationship needs a junction table; neither side holds the other's key. When the
+    evidence shows N:M grain, emit the junction yourself: one add_table with the two FK columns,
+    two 1:N add_relationship (one per side), and a set_pk on EACH of the junction's key columns
+    (the composite key) — never a direct N:M edge between the entity tables.
+  - A source listed with "derived_from" was unnested from a parent's array field — it is a real
+    child entity (one row per array element). Model it as its own table and emit the child→parent
+    1:N relationship on the surrogate pair named in its "link" (child _parentId → parent _rowId).
+    That link is structural lineage, not value overlap — do not expect detector findings for it.
   - Do not over-normalize: a bare value set with no attributes does not deserve a table.
 - Prefer the fewest tables that preserve integrity. Justify every table you add in "reply" — if
   you cannot say what distinct entity it models, do not add it.`;
