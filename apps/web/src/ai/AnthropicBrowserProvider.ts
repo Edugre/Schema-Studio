@@ -4,6 +4,7 @@ import type {
   ConversationTurn,
   ModelInfo,
   ParsedSource,
+  ProposeOptions,
   Schema,
   SuggestionDigest,
   SuggestionRanking,
@@ -36,10 +37,11 @@ const MODELS_TIMEOUT_MS = 15_000;
 /** Cap on investigation round-trips within a single propose() before we force a finalization. */
 const MAX_PREVIEW_ITERATIONS = 6;
 /**
- * On a fresh derivation (no history, sources present) `submit_schema_response` is withheld for
- * this many inner rounds, so the model spends them on probe/inspect/preview evidence-gathering
- * instead of finalizing from the prompt digest alone. Correction turns keep submit from round
- * one — they already investigated.
+ * On a fresh derivation (caller-declared `intent: "derive"`, sources present)
+ * `submit_schema_response` is withheld for this many inner rounds, so the model spends them on
+ * probe/inspect/preview evidence-gathering instead of finalizing from the prompt digest alone.
+ * Chat turns and correction rounds keep submit from round one — a plain question must not be
+ * forced through investigation, and correction turns already investigated.
  */
 const INVESTIGATION_ROUNDS = 2;
 
@@ -75,6 +77,7 @@ export class AnthropicBrowserProvider implements AiProvider {
     sources: ParsedSource[],
     message: string,
     history: ConversationTurn[] = [],
+    options?: ProposeOptions,
   ): Promise<AiProviderResult> {
     // Two system blocks with the cache breakpoint between them: the static instructions never
     // change per target, so they hit the prompt cache on every turn; the dynamic block re-embeds
@@ -91,9 +94,13 @@ export class AnthropicBrowserProvider implements AiProvider {
     ];
     const investigationTools = [PREVIEW_EXPORT_TOOL, INSPECT_SOURCE_TOOL, PROBE_JOIN_TOOL];
     let messages: ProviderMessage[] = [...history, { role: "user", content: message }];
-    // Fresh derivations get an evidence-gathering phase before submit is even offered;
-    // follow-up/correction turns (history present) or source-less questions do not.
-    const withheldRounds = history.length === 0 && sources.length > 0 ? INVESTIGATION_ROUNDS : 0;
+    // Fresh derivations (declared by the caller, never inferred from history length — a plain
+    // first-turn question must not be forced to fabricate tool calls) get an evidence-gathering
+    // phase before submit is even offered; correction rounds (history present) do not re-withhold.
+    const withheldRounds =
+      options?.intent === "derive" && history.length === 0 && sources.length > 0
+        ? INVESTIGATION_ROUNDS
+        : 0;
 
     // Agentic tool loop: the model may call preview_export (see the migration its design would
     // generate), inspect_source (see more of a column's values), or probe_join (verify a join

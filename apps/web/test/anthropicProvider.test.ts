@@ -75,13 +75,26 @@ describe("AnthropicBrowserProvider investigation phase", () => {
     const { bodies } = stubFetch([probeCall(), probeCall(), submitCall()]);
 
     const provider = new AnthropicBrowserProvider("sk-ant-test");
-    const result = await provider.propose(EMPTY_SCHEMA, [npiSource], "derive the schema");
+    const result = await provider.propose(EMPTY_SCHEMA, [npiSource], "derive the schema", [], {
+      intent: "derive",
+    });
 
     expect(toolNames(bodies[0])).not.toContain(COPILOT_RESPONSE_TOOL.name);
     expect(toolNames(bodies[1])).not.toContain(COPILOT_RESPONSE_TOOL.name);
     expect(toolNames(bodies[2])).toContain(COPILOT_RESPONSE_TOOL.name);
     expect(toolNames(bodies[0])).toContain(PROBE_JOIN_TOOL.name);
     expect(result.reply).toBe("Done.");
+  });
+
+  it("offers submit from round one on a plain chat first turn (intent not derive)", async () => {
+    const { bodies } = stubFetch([submitCall()]);
+
+    const provider = new AnthropicBrowserProvider("sk-ant-test");
+    await provider.propose(EMPTY_SCHEMA, [npiSource], "what does this column mean?", [], {
+      intent: "chat",
+    });
+
+    expect(toolNames(bodies[0])).toContain(COPILOT_RESPONSE_TOOL.name);
   });
 
   it("answers a probe_join call with live join evidence", async () => {

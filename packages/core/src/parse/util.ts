@@ -45,8 +45,9 @@ export function buildSourceField(
     samples: collectSamples(values),
     stats: collectStats(values),
     distinctValues,
-    // The wide join-discovery set is only worth carrying when it actually saw more distinct
-    // values than the capped scan window did — otherwise it would just duplicate memory.
-    ...(joinValues && joinValues.length > distinctValues.length ? { joinValues } : {}),
+    // Carry the wide join-discovery set whenever the wide pass ran, even when it saw nothing
+    // beyond the scan window: its presence is the "full-file fidelity" signal probe_join reads,
+    // and a redundant set is bounded by the distinct cap (~1000 strings), so the cost is trivial.
+    ...(joinValues ? { joinValues } : {}),
   };
 }

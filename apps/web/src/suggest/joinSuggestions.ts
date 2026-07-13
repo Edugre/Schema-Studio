@@ -6,9 +6,9 @@ import type {
   Schema,
   Source,
 } from "@grafture/core";
-import { detectJoinKeys, detectPrimaryKeys } from "@grafture/core";
+import { detectPrimaryKeys } from "@grafture/core";
 
-import { tableNameFromFilename } from "../sources/tableName.js";
+import { tableNameForSource } from "../sources/tableName.js";
 
 /**
  * GF-9b — surface the core content-aware detectors (GF-9) as reviewable suggestions.
@@ -46,6 +46,9 @@ function fieldNamesEqual(a: string, b: string): boolean {
 /**
  * Does the schema already contain a relationship between the two candidate columns?
  * Compared by field *name* (unordered) since suggestions are source-level, not id-level.
+ * Covers both shapes an applied suggestion produces: a direct edge between the two columns,
+ * and the N:M junction scaffold — two distinct relationships meeting at a shared (junction)
+ * table, one carrying each column's name.
  */
 function isAlreadyLinked(schema: Schema, candidate: JoinKeyCandidate): boolean {
   const fieldNameById = new Map<string, string>();
@@ -55,7 +58,7 @@ function isAlreadyLinked(schema: Schema, candidate: JoinKeyCandidate): boolean {
     }
   }
 
-  return schema.relationships.some((relationship) => {
+  const direct = schema.relationships.some((relationship) => {
     const from = fieldNameById.get(relationship.fromField);
     const to = fieldNameById.get(relationship.toField);
     if (from === undefined || to === undefined) {
@@ -67,12 +70,57 @@ function isAlreadyLinked(schema: Schema, candidate: JoinKeyCandidate): boolean {
       fieldNamesEqual(from, candidate.right.field) && fieldNamesEqual(to, candidate.left.field);
     return matchForward || matchReverse;
   });
+  if (direct) {
+    return true;
+  }
+
+  // Junction shape: per table, the ids of relationships touching it that carry each column.
+  const carriers = new Map<string, { left: Set<string>; right: Set<string> }>();
+  for (const relationship of schema.relationships) {
+    const names = [
+      fieldNameById.get(relationship.fromField),
+      fieldNameById.get(relationship.toField),
+    ];
+    const carriesLeft = names.some(
+      (name) => name !== undefined && fieldNamesEqual(name, candidate.left.field),
+    );
+    const carriesRight = names.some(
+      (name) => name !== undefined && fieldNamesEqual(name, candidate.right.field),
+    );
+    if (!carriesLeft && !carriesRight) {
+      continue;
+    }
+    for (const tableId of [relationship.fromTable, relationship.toTable]) {
+      const entry = carriers.get(tableId) ?? { left: new Set<string>(), right: new Set<string>() };
+      if (carriesLeft) {
+        entry.left.add(relationship.id);
+      }
+      if (carriesRight) {
+        entry.right.add(relationship.id);
+      }
+      carriers.set(tableId, entry);
+    }
+  }
+
+  return [...carriers.values()].some(({ left, right }) => {
+    if (left.size === 0 || right.size === 0) {
+      return false;
+    }
+    // Two distinct relationships must meet here — one per column.
+    const [onlyLeft] = left;
+    const [onlyRight] = right;
+    return !(left.size === 1 && right.size === 1 && onlyLeft === onlyRight);
+  });
 }
 
-/** Run the detectors over the loaded sources and shape the results for display. */
-export function buildJoinSuggestions(sources: Source[], schema: Schema): JoinSuggestion[] {
-  const candidates = detectJoinKeys(sources);
-
+/**
+ * Shape already-detected join candidates for display. Callers pass the `detectJoinKeys` result
+ * so the expensive detection pass can be memoized on sources alone, independent of schema edits.
+ */
+export function buildJoinSuggestions(
+  candidates: JoinKeyCandidate[],
+  schema: Schema,
+): JoinSuggestion[] {
   return candidates.slice(0, MAX_SUGGESTIONS).map((candidate) => ({
     id: `${candidate.left.sourceId}:${candidate.left.field}->${candidate.right.sourceId}:${candidate.right.field}`,
     candidate,
@@ -87,7 +135,7 @@ export function buildJoinSuggestions(sources: Source[], schema: Schema): JoinSug
 }
 
 function tableForSource(schema: Schema, source: Source, fieldName: string) {
-  const base = tableNameFromFilename(source.name).toLowerCase();
+  const base = tableNameForSource(source).toLowerCase();
   const hasField = (table: Schema["tables"][number]) =>
     table.fields.some((field) => fieldNamesEqual(field.name, fieldName));
 
@@ -161,7 +209,7 @@ export function buildApplyPlan(
       return existing.name;
     }
 
-    const base = tableNameFromFilename(source.name);
+    const base = tableNameForSource(source);
     let name = base;
     let index = 2;
     while (reserved.has(name.toLowerCase())) {

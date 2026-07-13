@@ -56,6 +56,39 @@ describe("parseJson child-source unnesting", () => {
     expect(npiField?.samples).toEqual(["1111111111", "2222222222", "3333333333"]);
   });
 
+  it("keeps a mixed-type key as a parent column instead of claiming it as a child", () => {
+    // "notes" is a plain string in one record and an array of objects in another: claiming it
+    // as a child key would silently drop the string values from both the parent and the child.
+    const mixed = JSON.stringify([
+      { grantNumber: "H80CS001", notes: "plain text note" },
+      { grantNumber: "H80CS002", notes: [{ author: "a", body: "structured" }] },
+      { grantNumber: "H80CS003" },
+    ]);
+
+    const sources = parseJson(mixed, "mixed.json", opts());
+
+    expect(sources).toHaveLength(1);
+    const [parent] = sources;
+    expect(parent?.fields.map((field) => field.name)).toContain("notes");
+    const notes = parent?.fields.find((field) => field.name === "notes");
+    expect(notes?.samples).toContain("plain text note");
+  });
+
+  it("still claims a child key when its only other values are absent or empty", () => {
+    const sparse = JSON.stringify([
+      { grantNumber: "H80CS001", npiNumbers: [{ npiNumber: "1111111111" }] },
+      { grantNumber: "H80CS002", npiNumbers: [] },
+      { grantNumber: "H80CS003", npiNumbers: null },
+      { grantNumber: "H80CS004" },
+    ]);
+
+    const sources = parseJson(sparse, "sparse.json", opts());
+
+    expect(sources).toHaveLength(2);
+    expect(sources[1]?.name).toBe("sparse.json.npiNumbers");
+    expect(sources[1]?.rowCount).toBe(1);
+  });
+
   it("adds a synthetic _rowId to the parent and drops the array blob column", () => {
     const [parent] = parseJson(input, "opais.json", opts());
 

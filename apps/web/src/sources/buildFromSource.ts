@@ -1,7 +1,7 @@
 import type { Schema, Source, SourceField } from "@grafture/core";
 
 import type { RunActionsResult } from "../store/index.js";
-import { tableNameFromFilename, uniqueTableName } from "./tableName.js";
+import { tableNameForSource, uniqueTableName } from "./tableName.js";
 
 type RunActions = (rawActions: unknown[]) => RunActionsResult;
 type AddField = (
@@ -10,13 +10,18 @@ type AddField = (
   opts?: { type?: string; pk?: boolean; fk?: boolean },
 ) => RunActionsResult;
 
-/** Surrogate column names carrying the structural parent↔child link (see core's parseJson). */
-const SYNTHETIC_ROW_ID = "_rowId";
-const SYNTHETIC_PARENT_ID = "_parentId";
+/**
+ * The parser-injected surrogate field carrying this source's half of the structural
+ * parent↔child link (see core's parseJson). Matched by the `synthetic` flag, never by name —
+ * a real data column named `_rowId`/`_parentId` forces the parser to rename the surrogate.
+ */
+function surrogateField(source: Source): SourceField | undefined {
+  return source.fields.find((field) => field.synthetic);
+}
 
 /** The canvas table built from `source`, matched by base name and a required field. */
 function tableFor(schema: Schema, source: Source, fieldName: string) {
-  const base = tableNameFromFilename(source.name).toLowerCase();
+  const base = tableNameForSource(source).toLowerCase();
   const hasField = (table: Schema["tables"][number]) =>
     table.fields.some((field) => field.name.toLowerCase() === fieldName.toLowerCase());
 
@@ -27,11 +32,12 @@ function tableFor(schema: Schema, source: Source, fieldName: string) {
 }
 
 /**
- * Build a table from a source in one validated batch. When the source is a child unnested from
- * a JSON parent (`derivedFrom` lineage) and the parent's table is already on the canvas, the
- * structural child→parent 1:N relationship (`_parentId` → `_rowId`) is emitted in the same
- * batch — the surrogate pair is excluded from the overlap detectors, so this is the only
- * deterministic path that links them.
+ * Build a table from a source in one validated batch, wiring the structural child→parent 1:N
+ * relationship on the surrogate pair whenever the other side's table is already on the canvas —
+ * building a child links it to its parent's table, and building a parent backfills the link to
+ * any of its children built earlier, so build order doesn't decide whether the link exists. The
+ * surrogate pair is excluded from the overlap detectors, so this is the only deterministic path
+ * that links them.
  */
 export function buildTableFromSource(
   runActions: RunActions,
@@ -39,7 +45,7 @@ export function buildTableFromSource(
   source: Source,
   allSources: Source[] = [],
 ): RunActionsResult & { tableName: string } {
-  const base = tableNameFromFilename(source.name);
+  const base = tableNameForSource(source);
   const tableName = uniqueTableName(schema, base);
 
   const actions: unknown[] = [
@@ -53,19 +59,42 @@ export function buildTableFromSource(
     },
   ];
 
-  const hasParentLink = source.fields.some((field) => field.name === SYNTHETIC_PARENT_ID);
-  if (source.derivedFrom && hasParentLink) {
+  const ownSurrogate = surrogateField(source);
+
+  if (source.derivedFrom && ownSurrogate) {
+    // Child being built: link to the parent's table if it's already on the canvas.
     const parent = allSources.find((entry) => entry.id === source.derivedFrom?.parentId);
-    const parentTable = parent ? tableFor(schema, parent, SYNTHETIC_ROW_ID) : undefined;
-    if (parentTable) {
+    const parentSurrogate = parent ? surrogateField(parent) : undefined;
+    const parentTable =
+      parent && parentSurrogate ? tableFor(schema, parent, parentSurrogate.name) : undefined;
+    if (parentTable && parentSurrogate) {
       actions.push({
         op: "add_relationship",
         from_table: parentTable.name,
-        from_field: SYNTHETIC_ROW_ID,
+        from_field: parentSurrogate.name,
         to_table: tableName,
-        to_field: SYNTHETIC_PARENT_ID,
+        to_field: ownSurrogate.name,
         cardinality: "1:N",
       });
+    }
+  } else if (ownSurrogate) {
+    // Parent being built: backfill the link to any child tables built before this one.
+    for (const child of allSources) {
+      if (child.derivedFrom?.parentId !== source.id) {
+        continue;
+      }
+      const childSurrogate = surrogateField(child);
+      const childTable = childSurrogate ? tableFor(schema, child, childSurrogate.name) : undefined;
+      if (childTable && childSurrogate) {
+        actions.push({
+          op: "add_relationship",
+          from_table: tableName,
+          from_field: ownSurrogate.name,
+          to_table: childTable.name,
+          to_field: childSurrogate.name,
+          cardinality: "1:N",
+        });
+      }
     }
   }
 

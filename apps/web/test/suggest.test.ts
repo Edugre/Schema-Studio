@@ -61,7 +61,10 @@ function onlyCandidate(sources: Source[]): JoinKeyCandidate {
 
 describe("buildJoinSuggestions", () => {
   it("surfaces overlap, shared count, and a normalization warning from sample values", () => {
-    const [suggestion, ...rest] = buildJoinSuggestions([hrsa, opais], emptySchema());
+    const [suggestion, ...rest] = buildJoinSuggestions(
+      detectJoinKeys([hrsa, opais]),
+      emptySchema(),
+    );
 
     expect(rest).toHaveLength(0);
     expect(suggestion?.leftLabel).toBe("covered_entities.csv · grant_number");
@@ -102,14 +105,68 @@ describe("buildJoinSuggestions", () => {
       ],
     };
 
-    const [suggestion] = buildJoinSuggestions([hrsa, opais], schema);
+    const [suggestion] = buildJoinSuggestions(detectJoinKeys([hrsa, opais]), schema);
+    expect(suggestion?.alreadyLinked).toBe(true);
+  });
+
+  it("marks a suggestion already linked when an applied N:M junction connects the columns", () => {
+    // The shape buildApplyPlan's N:M branch produces: no direct edge between the two columns,
+    // but two 1:N relationships meeting at a junction table that carries both key columns.
+    const schema: Schema = {
+      tables: [
+        {
+          id: "t1",
+          name: "covered_entities",
+          x: 0,
+          y: 0,
+          fields: [{ id: "f1", name: "grant_number", type: "text", pk: false, fk: false }],
+        },
+        {
+          id: "t2",
+          name: "organizations",
+          x: 0,
+          y: 0,
+          fields: [{ id: "f2", name: "grant_id", type: "text", pk: false, fk: false }],
+        },
+        {
+          id: "t3",
+          name: "covered_entities_organizations",
+          x: 0,
+          y: 0,
+          fields: [
+            { id: "f3", name: "grant_number", type: "text", pk: true, fk: true },
+            { id: "f4", name: "grant_id", type: "text", pk: true, fk: true },
+          ],
+        },
+      ],
+      relationships: [
+        {
+          id: "r1",
+          fromTable: "t1",
+          fromField: "f1",
+          toTable: "t3",
+          toField: "f3",
+          cardinality: "1:N",
+        },
+        {
+          id: "r2",
+          fromTable: "t2",
+          fromField: "f2",
+          toTable: "t3",
+          toField: "f4",
+          cardinality: "1:N",
+        },
+      ],
+    };
+
+    const [suggestion] = buildJoinSuggestions(detectJoinKeys([hrsa, opais]), schema);
     expect(suggestion?.alreadyLinked).toBe(true);
   });
 
   it("returns nothing when sources share no values", () => {
     const a = source("a", "a.csv", "code", ["aaa", "bbb", "ccc"]);
     const b = source("b", "b.csv", "code", ["xxx", "yyy", "zzz"]);
-    expect(buildJoinSuggestions([a, b], emptySchema())).toEqual([]);
+    expect(buildJoinSuggestions(detectJoinKeys([a, b]), emptySchema())).toEqual([]);
   });
 });
 
@@ -216,7 +273,7 @@ const customers = statSource("c", "customers.csv", "id", ["1", "2", "3"], {
 
 describe("grain-aware join suggestions", () => {
   it("surfaces the inferred grain label", () => {
-    const [suggestion] = buildJoinSuggestions([orders, customers], emptySchema());
+    const [suggestion] = buildJoinSuggestions(detectJoinKeys([orders, customers]), emptySchema());
     expect(suggestion?.grainLabel).toBe("N:1");
   });
 

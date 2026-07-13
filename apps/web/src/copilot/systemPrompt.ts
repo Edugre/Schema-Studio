@@ -65,9 +65,13 @@ function summarizeSources(sources: Source[]) {
 
   return sources.map((source) => {
     const omitted = source.fields.length - MAX_PROMPT_FIELDS_PER_SOURCE;
-    const parentName = source.derivedFrom
-      ? (sourceById.get(source.derivedFrom.parentId)?.name ?? source.derivedFrom.parentId)
-      : undefined;
+    // No fallback to the raw parent id: if the parent source was removed, the lineage block is
+    // omitted entirely rather than instructing the model to reference a table that can't exist.
+    const parent = source.derivedFrom ? sourceById.get(source.derivedFrom.parentId) : undefined;
+    // The surrogate names are read off the fields (the `synthetic` flag), never hardcoded — the
+    // parser renames its surrogates when the data already uses `_rowId`/`_parentId`.
+    const childSurrogate = source.fields.find((field) => field.synthetic)?.name;
+    const parentSurrogate = parent?.fields.find((field) => field.synthetic)?.name;
 
     return {
       name: source.name,
@@ -77,10 +81,12 @@ function summarizeSources(sources: Source[]) {
       // Lineage channel: this source was unnested from a parent's array field. The surrogate
       // link below is structural (excluded from the value-overlap detectors) — the model must
       // model it as a child→parent FK from this lineage, not rediscover it by overlap.
-      ...(source.derivedFrom && parentName !== undefined
+      ...(source.derivedFrom && parent
         ? {
-            derived_from: { parent: parentName, arrayField: source.derivedFrom.arrayField },
-            link: `${source.name}._parentId → ${parentName}._rowId`,
+            derived_from: { parent: parent.name, arrayField: source.derivedFrom.arrayField },
+            ...(childSurrogate && parentSurrogate
+              ? { link: `${source.name}.${childSurrogate} → ${parent.name}.${parentSurrogate}` }
+              : {}),
           }
         : {}),
       fields: source.fields.slice(0, MAX_PROMPT_FIELDS_PER_SOURCE).map((field) => ({
@@ -225,7 +231,7 @@ const DESIGN_DOCTRINE = `How to design the schema — model entities, not files:
     (the composite key) — never a direct N:M edge between the entity tables.
   - A source listed with "derived_from" was unnested from a parent's array field — it is a real
     child entity (one row per array element). Model it as its own table and emit the child→parent
-    1:N relationship on the surrogate pair named in its "link" (child _parentId → parent _rowId).
+    1:N relationship on the surrogate pair named in its "link", using those exact column names.
     That link is structural lineage, not value overlap — do not expect detector findings for it.
   - Do not over-normalize: a bare value set with no attributes does not deserve a table.
 - Prefer the fewest tables that preserve integrity. Justify every table you add in "reply" — if

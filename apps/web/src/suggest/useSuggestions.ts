@@ -1,5 +1,7 @@
 import { useMemo } from "react";
 
+import { detectJoinKeys } from "@grafture/core";
+
 import { useSchemaStore } from "../store/index.js";
 import {
   buildApplyPlan,
@@ -69,6 +71,11 @@ export function useSuggestions(): SuggestionsApi {
   const selectTable = useSchemaStore((state) => state.selectTable);
   const dismissSuggestions = useSchemaStore((state) => state.dismissSuggestions);
 
+  // The detection pass normalizes and intersects the wide join-value sets — expensive with
+  // large files — and depends only on the parsed sources, so it must not re-run on schema
+  // edits (every table drag, rename, or undo produces a new schema object).
+  const joinCandidates = useMemo(() => detectJoinKeys(sources), [sources]);
+
   const groups = useMemo<SuggestionGroup[]>(() => {
     const dismissed = new Set(dismissedIds);
 
@@ -76,7 +83,7 @@ export function useSuggestions(): SuggestionsApi {
       .filter((key) => !dismissed.has(key.id))
       .map((key) => ({ id: key.id, group: "pk", needsReview: false, key }));
 
-    const joinItems: SuggestionItem[] = buildJoinSuggestions(sources, schema)
+    const joinItems: SuggestionItem[] = buildJoinSuggestions(joinCandidates, schema)
       .filter((join) => !join.alreadyLinked && !dismissed.has(join.id))
       .map((join) => ({
         id: join.id,
@@ -96,7 +103,7 @@ export function useSuggestions(): SuggestionsApi {
         { key: "type" as const, label: GROUP_LABEL.type, items: typeItems },
       ] satisfies SuggestionGroup[]
     ).filter((group) => group.items.length > 0);
-  }, [sources, schema, dismissedIds]);
+  }, [sources, schema, dismissedIds, joinCandidates]);
 
   return useMemo<SuggestionsApi>(() => {
     const open = groups.flatMap((group) => group.items);

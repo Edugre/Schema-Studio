@@ -236,7 +236,9 @@ describe("OpenAiBrowserProvider investigation phase", () => {
     const { bodies } = stubFetch([probe(), probe(), submit()]);
 
     const provider = new OpenAiBrowserProvider("sk-test");
-    const result = await provider.propose(EMPTY_SCHEMA, [npiSource], "derive the schema");
+    const result = await provider.propose(EMPTY_SCHEMA, [npiSource], "derive the schema", [], {
+      intent: "derive",
+    });
 
     expect(toolNames(bodies[0])).not.toContain(COPILOT_RESPONSE_TOOL.name);
     expect(toolNames(bodies[1])).not.toContain(COPILOT_RESPONSE_TOOL.name);
@@ -244,6 +246,17 @@ describe("OpenAiBrowserProvider investigation phase", () => {
     // The investigation tools are offered throughout, including probe_join.
     expect(toolNames(bodies[0])).toContain("probe_join");
     expect(result.reply).toBe("Done.");
+  });
+
+  it("offers submit from round one on a plain chat first turn (intent not derive)", async () => {
+    const { bodies } = stubFetch([submit()]);
+
+    const provider = new OpenAiBrowserProvider("sk-test");
+    await provider.propose(EMPTY_SCHEMA, [npiSource], "what does this column mean?", [], {
+      intent: "chat",
+    });
+
+    expect(toolNames(bodies[0])).toContain(COPILOT_RESPONSE_TOOL.name);
   });
 
   it("answers a probe_join call with live join evidence", async () => {
