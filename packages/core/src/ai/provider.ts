@@ -22,6 +22,17 @@ export type ConversationTurn = {
 };
 
 /**
+ * Caller-declared intent for a propose call. The entry point knows whether it is kicking off a
+ * fresh schema derivation (the "draft a schema" flow) or relaying an ordinary chat turn — a
+ * provider must never have to infer this from history length, which misclassifies plain
+ * first-turn questions as derivations. Providers may use `intent: "derive"` to gate
+ * investigation-phase behavior (e.g. withholding finalization for a few tool rounds).
+ */
+export type ProposeOptions = {
+  intent?: "derive" | "chat";
+};
+
+/**
  * A lossy projection of one already-detected suggestion, sent to the model for reranking. Carries
  * only the stats the detectors already computed — never raw sample values (privacy + token cost).
  * `id` echoes the consumer's suggestion id so a returned {@link SuggestionRanking} can be matched
@@ -86,6 +97,7 @@ export interface AiProvider {
     sources: ParsedSource[],
     message: string,
     history?: ConversationTurn[],
+    options?: ProposeOptions,
   ): Promise<AiProviderResult>;
 
   /**

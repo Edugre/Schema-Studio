@@ -164,7 +164,9 @@ export function CopilotPanel({
           setProgress({ attempt, max: DEFAULT_MAX_ITERATIONS });
           scrollToBottom();
           const state = useSchemaStore.getState();
-          const proposed = await provider.propose(state.schema, state.sources, message, turns);
+          const proposed = await provider.propose(state.schema, state.sources, message, turns, {
+            intent: "chat",
+          });
           return {
             reply: proposed.reply,
             actions: proposed.actions,
@@ -257,6 +259,7 @@ export function CopilotPanel({
             useSchemaStore.getState().sources,
             msg,
             turns,
+            { intent: "derive" },
           );
           return {
             reply: proposed.reply,

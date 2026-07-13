@@ -144,22 +144,37 @@ function recordFieldValues(record: Record<string, unknown>): Map<string, string>
 }
 
 /**
- * Top-level keys whose value is an array of objects in at least one scanned record. These are
- * repeating sub-entities: each becomes a child `Source` instead of an opaque JSON-string column
- * on the parent. Arrays of scalars are NOT included — they keep the stringify path.
+ * Top-level keys whose value is consistently an array of objects across the scanned records.
+ * These are repeating sub-entities: each becomes a child `Source` instead of an opaque
+ * JSON-string column on the parent. Arrays of scalars are NOT included — they keep the
+ * stringify path. A key that holds an array of objects in some records but a scalar (or scalar
+ * array) in others is disqualified and stays a parent column: claiming it would silently drop
+ * its non-array values from both the parent and the child. Absent values (undefined, null, "",
+ * empty array) are compatible with either shape and don't disqualify.
  */
 function detectChildArrayKeys(records: Record<string, unknown>[]): string[] {
   const keys: string[] = [];
   const seen = new Set<string>();
+  const disqualified = new Set<string>();
   for (const record of records) {
     for (const [key, value] of Object.entries(record)) {
-      if (!seen.has(key) && asRecordArray(value)) {
-        seen.add(key);
-        keys.push(key);
+      if (value === undefined || value === null || value === "") {
+        continue;
+      }
+      if (Array.isArray(value) && value.length === 0) {
+        continue;
+      }
+      if (asRecordArray(value)) {
+        if (!seen.has(key)) {
+          seen.add(key);
+          keys.push(key);
+        }
+      } else {
+        disqualified.add(key);
       }
     }
   }
-  return keys;
+  return keys.filter((key) => !disqualified.has(key));
 }
 
 /** A record paired with its index in the full record list (the index IS the `_rowId` value). */

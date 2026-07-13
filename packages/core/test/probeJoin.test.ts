@@ -90,6 +90,26 @@ describe("probeJoin", () => {
     }
   });
 
+  it("keeps full fidelity for a fully-scanned file whose column repeats values", () => {
+    // 500 rows, 3 distinct values: the scan window (1000 rows) covered every row, so the
+    // figures are exact — fidelity must compare against the window, not the distinct count.
+    const repeats = source(
+      "r",
+      "small.csv",
+      [field("state", ["CA", "NY", "TX"])],
+      500, // rowCount > distinct count, but under MAX_SCAN_ROWS
+    );
+    const result = probeJoin([repeats, ...sources], {
+      left: { source: "small.csv", field: "state" },
+      right: { source: "parent.csv", field: "id" },
+    });
+
+    if (!result.ok) {
+      throw new Error(result.error);
+    }
+    expect(result.leftFullFidelity).toBe(true);
+  });
+
   it("flags degraded fidelity when a wide set is missing for a large file", () => {
     const bigWithoutWide = source(
       "b",

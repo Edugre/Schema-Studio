@@ -4,6 +4,7 @@ import type {
   ConversationTurn,
   ModelInfo,
   ParsedSource,
+  ProposeOptions,
   Schema,
   SuggestionDigest,
   SuggestionRanking,
@@ -21,10 +22,11 @@ import { parseRankingResponse } from "../suggest/rerank.js";
 /** Cap on investigation round-trips within a single propose() before we force a finalization. */
 const MAX_PREVIEW_ITERATIONS = 6;
 /**
- * On a fresh derivation (no history, sources present) `submit_schema_response` is withheld for
- * this many inner rounds, so the model spends them on probe/inspect/preview evidence-gathering
- * instead of finalizing from the prompt digest alone. Correction turns keep submit from round
- * one — they already investigated.
+ * On a fresh derivation (caller-declared `intent: "derive"`, sources present)
+ * `submit_schema_response` is withheld for this many inner rounds, so the model spends them on
+ * probe/inspect/preview evidence-gathering instead of finalizing from the prompt digest alone.
+ * Chat turns and correction rounds keep submit from round one — a plain question must not be
+ * forced through investigation, and correction turns already investigated.
  */
 const INVESTIGATION_ROUNDS = 2;
 
@@ -189,6 +191,7 @@ export class OpenAiCompatibleProvider implements AiProvider {
     sources: ParsedSource[],
     message: string,
     history: ConversationTurn[] = [],
+    options?: ProposeOptions,
   ): Promise<AiProviderResult> {
     // OpenAI has no cache-control blocks, so the static + dynamic halves collapse into one system
     // message (automatic prompt caching still applies to the stable prefix, no extra work).
@@ -201,7 +204,7 @@ export class OpenAiCompatibleProvider implements AiProvider {
     }
 
     try {
-      return await this.proposeWithTools(system, schema, sources, message, history);
+      return await this.proposeWithTools(system, schema, sources, message, history, options);
     } catch (error) {
       // A runtime without function calling either rejects the request (isToolUnsupportedError — a
       // durable property, so latch it) or answers in prose (ToolCallMissingError — possibly a
@@ -226,15 +229,21 @@ export class OpenAiCompatibleProvider implements AiProvider {
     sources: ParsedSource[],
     message: string,
     history: ConversationTurn[],
+    options?: ProposeOptions,
   ): Promise<AiProviderResult> {
     const investigationTools = [PREVIEW_EXPORT_TOOL, INSPECT_SOURCE_TOOL, PROBE_JOIN_TOOL];
     let messages: OpenAiMessage[] = [
       ...history.map((turn) => ({ role: turn.role, content: turn.content })),
       { role: "user", content: message },
     ];
-    // Fresh derivations get an evidence-gathering phase before submit is even offered;
-    // follow-up/correction turns (history present) or source-less questions do not.
-    const withheldRounds = history.length === 0 && sources.length > 0 ? INVESTIGATION_ROUNDS : 0;
+    // Fresh derivations (declared by the caller, never inferred from history length — a plain
+    // first-turn question must not be forced to fabricate tool calls, or worse, answer in prose
+    // and get bounced into the JSON fallback) get an evidence-gathering phase before submit is
+    // even offered; correction rounds (history present) do not re-withhold.
+    const withheldRounds =
+      options?.intent === "derive" && history.length === 0 && sources.length > 0
+        ? INVESTIGATION_ROUNDS
+        : 0;
 
     // Agentic tool loop: the model may call preview_export, inspect_source, or probe_join (all
     // read-only, in-memory) then finalize with submit_schema_response. `tool_choice: "required"`

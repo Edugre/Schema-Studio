@@ -1,5 +1,5 @@
 import type { FieldStats, Source, SourceField } from "../parse/types.js";
-import { collectStats, isNullToken } from "../parse/sample.js";
+import { collectStats, isNullToken, MAX_SCAN_ROWS } from "../parse/sample.js";
 
 /**
  * Content-aware modeling primitives (GF-9). These are pure, deterministic functions
@@ -939,8 +939,10 @@ function hasFullFidelity(source: Source, field: SourceField): boolean {
   if (field.joinValues) {
     return true;
   }
-  // Without a wide set, fidelity holds only when the file never exceeded the scan window.
-  return source.rowCount !== undefined && source.rowCount <= (field.distinctValues ?? []).length;
+  // Without a wide set, fidelity holds only when the file never exceeded the scan window —
+  // compare against the window itself, not the deduped distinct count, which shrinks with
+  // every repeated or blank value.
+  return source.rowCount !== undefined && source.rowCount <= MAX_SCAN_ROWS;
 }
 
 /**
