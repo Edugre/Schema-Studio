@@ -253,6 +253,31 @@ describe("schemaStore", () => {
       store.getState().removeSource("source-1");
       expect(store.getState().sources).toEqual([]);
     });
+
+    it("removing a JSON parent also removes the children unnested from it", () => {
+      const store = createSchemaStore({ makeId: makeTestIds() });
+      const parent: Source = { ...sampleSource("parent"), name: "opais.json", kind: "json" };
+      const child: Source = {
+        ...sampleSource("child"),
+        name: "opais.json.npiNumbers",
+        kind: "json",
+        derivedFrom: { parentId: "parent", arrayField: "npiNumbers" },
+      };
+      const unrelated = sampleSource("csv");
+
+      store.getState().addSources([parent, child, unrelated]);
+      store.getState().removeSource("parent");
+
+      expect(store.getState().sources).toEqual([unrelated]);
+
+      // One file removed is one undo step, children included.
+      store.getState().undo();
+      expect(store.getState().sources.map((source) => source.id)).toEqual([
+        "parent",
+        "child",
+        "csv",
+      ]);
+    });
   });
 
   describe("chat", () => {

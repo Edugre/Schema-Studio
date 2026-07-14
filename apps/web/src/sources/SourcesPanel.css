@@ -197,6 +197,45 @@
   overflow: hidden;
 }
 
+/* ---- Groups: one uploaded file, plus the sources unnested from its JSON array fields ---- */
+.sources-panel__group {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.sources-panel__nested {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-left: 19px;
+  padding: 6px 0 0 13px;
+}
+
+/* The rail tying the children to the parent card above them. */
+.sources-panel__nested::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 14px;
+  left: 0;
+  width: 1px;
+  background: var(--border-subtle);
+}
+
+.sources-panel__source--nested {
+  background: var(--bg-panel);
+}
+
+.sources-panel__source--nested .sources-panel__source-header {
+  padding: 8px 10px;
+}
+
+.sources-panel__source--nested .sources-panel__source-icon {
+  color: var(--accent);
+}
+
 .sources-panel__source-header {
   display: flex;
   align-items: center;
