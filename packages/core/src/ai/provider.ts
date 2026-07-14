@@ -13,6 +13,15 @@ export type AiProviderResult = {
   reply: string;
   actions: unknown[];
   status?: CopilotStatus;
+  /**
+   * An out-of-band note from the PROVIDER (not the model) about how this turn was produced —
+   * e.g. a local runtime that can't call tools ran in prompt-based JSON mode, so the copilot
+   * could not probe joins or inspect values before answering. Rendered beside the reply, never
+   * inside it: the reply is the model's words and is fed back as conversation history, and a
+   * provider note must not become something the model reads as its own. Optional; most turns
+   * have none.
+   */
+  notice?: string;
 };
 
 /** A prior turn in the copilot conversation, in the order it occurred. */

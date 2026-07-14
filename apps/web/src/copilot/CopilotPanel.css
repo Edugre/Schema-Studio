@@ -370,6 +370,25 @@
   flex-shrink: 0;
 }
 
+/* Provider notice (e.g. a local model ran without tool calls). Informational, not a failure —
+   deliberately quieter than the amber "Couldn't apply" chip so it can't be mistaken for one. */
+.copilot-chip--notice {
+  margin-top: 8px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface);
+  color: var(--text-muted);
+}
+
+.copilot-chip--notice svg {
+  flex-shrink: 0;
+  color: var(--text-faint);
+}
+
+.copilot-chip--notice .copilot-markdown {
+  font-size: 12px;
+  line-height: 16px;
+}
+
 /* ---- Markdown body ---- */
 .copilot-markdown {
   white-space: normal;

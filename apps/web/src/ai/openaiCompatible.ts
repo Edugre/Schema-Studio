@@ -45,6 +45,20 @@ const JSON_OUTPUT_INSTRUCTION = [
   "</output_format>",
 ].join("\n");
 
+/**
+ * Appended to the FIRST reply a model produces in JSON-fallback mode. The fallback keeps a
+ * non-tool model usable, but it silently costs the agentic investigation — `probe_join` and
+ * `inspect_source` never run, so the copilot reasons from the prompt digest alone instead of
+ * measuring the joins it proposes. That is precisely the content-aware modeling the product is
+ * for, so degrading into it without a word would quietly misrepresent the answer's basis.
+ */
+const JSON_FALLBACK_NOTICE = [
+  "_This model answered without calling tools, so Grafture ran it in JSON mode: it reasoned from",
+  "the schema and sample values in the prompt, but could **not** probe joins or inspect more values",
+  "to verify them. For the full agentic loop, pick a tool-capable local model — e.g. `qwen2.5`,",
+  "`llama3.1`, or `mistral-nemo`._",
+].join(" ");
+
 // A local runtime signals "no function calling" either by rejecting the request outright (these
 // substrings appear in the error body) or by answering in prose. Both route to the JSON fallback.
 const TOOL_UNSUPPORTED_PATTERNS = [
@@ -181,6 +195,15 @@ export class OpenAiCompatibleProvider implements AiProvider {
    */
   private toolsUnsupported = false;
 
+  /**
+   * Whether the user has already been told this model is running without the investigation tools.
+   * The fallback is silent by design — it produces a perfectly ordinary-looking reply — so without
+   * this note the user never learns that `probe_join`/`inspect_source` never ran and the copilot
+   * answered from the prompt digest alone. Told once per provider instance (i.e. once per
+   * model/endpoint choice, since `useAiProvider` rebuilds on any change), not once per turn.
+   */
+  private fallbackNoticeShown = false;
+
   constructor(
     protected readonly config: OpenAiCompatibleConfig,
     protected readonly target: TargetId,
@@ -307,13 +330,39 @@ export class OpenAiCompatibleProvider implements AiProvider {
     const data = await this.request(`${system}\n\n${JSON_OUTPUT_INSTRUCTION}`, messages);
     const text = data.choices?.[0]?.message?.content ?? "";
     if (!text.trim()) {
-      return { reply: "The model returned no usable response.", actions: [], status: "blocked" };
+      return {
+        reply: "The model returned no usable response.",
+        actions: [],
+        status: "blocked",
+        ...this.fallbackNotice(),
+      };
     }
     const parsed = parseCopilotResponse(text);
     if ("error" in parsed) {
-      return { reply: `${text}\n\n(${parsed.error})`.trim(), actions: [], status: "blocked" };
+      return {
+        reply: `${text}\n\n(${parsed.error})`.trim(),
+        actions: [],
+        status: "blocked",
+        ...this.fallbackNotice(),
+      };
     }
-    return parsed;
+    return { ...parsed, ...this.fallbackNotice() };
+  }
+
+  /**
+   * The JSON-mode notice, once per provider instance — spread into the result, so it stays OUT of
+   * `reply`. Two reasons it can't just be appended to the reply text: the chat feeds assistant
+   * `text` back as conversation history, so the model would read our words as its own; and the
+   * notice is ours, not the model's, which is exactly the distinction `applied`/`rejected` already
+   * draw. Emitted on blocked replies too — a model too weak to call tools is also the one most
+   * likely to emit unparseable JSON, and "no usable response" alone doesn't finger the model.
+   */
+  private fallbackNotice(): { notice?: string } {
+    if (this.fallbackNoticeShown) {
+      return {};
+    }
+    this.fallbackNoticeShown = true;
+    return { notice: JSON_FALLBACK_NOTICE };
   }
 
   /** Dispatch one preview/inspect tool call to its pure runner, or report an unknown tool. */

@@ -193,6 +193,7 @@ export function CopilotPanel({
             reply: proposed.reply,
             actions: proposed.actions,
             status: proposed.status ?? "needs_revision",
+            notice: proposed.notice,
           };
         },
         apply: (actions) => {
@@ -216,11 +217,15 @@ export function CopilotPanel({
       const rejectedFinal = last?.rejected ?? [];
       const footer = outcomeFooter(result.outcome, result.steps.length);
       const reply = last?.reply || "(No reply text returned.)";
+      // A provider notice can be raised on any round (the fallback latches on the first), so take
+      // the first one seen rather than only the last step's.
+      const notice = result.steps.find((step) => step.notice)?.notice;
 
       const assistantMessage: ChatMessage = {
         id: nextMessageId(),
         role: "assistant",
         text: footer ? `${reply}\n\n${footer}` : reply,
+        ...(notice ? { notice } : {}),
         ...(appliedAll.length > 0 ? { applied: appliedAll } : {}),
         ...(rejectedFinal.length > 0
           ? {
@@ -480,6 +485,12 @@ export function CopilotPanel({
                           </span>
                           <div className="copilot-body">
                             <Markdown>{message.text}</Markdown>
+                            {message.notice ? (
+                              <div className="copilot-chip copilot-chip--notice">
+                                <InfoIcon size={15} />
+                                <Markdown>{message.notice}</Markdown>
+                              </div>
+                            ) : null}
                             {message.applied && message.applied.length > 0 ? (
                               <AppliedCard lines={message.applied} />
                             ) : null}
