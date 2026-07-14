@@ -62,6 +62,12 @@ export type JoinKeyCandidate = {
   /** True when normalization meaningfully increases the overlap. */
   requiresNormalization: boolean;
   formatMismatch: FormatMismatch | null;
+  /**
+   * How key-like the FK (more-contained) side is: its distinct values as a share of its own
+   * table's rows, [0, 1]. Near 1 for a real key, near 0 for an enum whose values are shared only
+   * because its value space is closed. This is what ranks candidates — see `candidateStrength`.
+   */
+  fkSideKeyness: number;
   /** Relationship grain, judged against the modeled entity when a side keys one (GAP F). */
   grain: Grain;
   /** Modeling decision derived from containment/grain/blanks — see `classifyRelationship`. */
@@ -95,13 +101,6 @@ export type DetectOptions = {
   minSharedValues?: number;
   /** Minimum one-way containment for the FK-shaped path. Default 0.4. */
   minContainment?: number;
-  /**
-   * Precomputed functional dependencies, whose determinants are the modeled-entity keys grain
-   * inference is judged against (GAP F). Pass them when you already ran the detector — it is the
-   * most expensive one (O(columns² × sampled rows)) and would otherwise run twice. Defaults to
-   * computing them internally.
-   */
-  functionalDependencies?: FunctionalDependencyCandidate[];
 };
 
 const DEFAULT_MIN_OVERLAP = 0.3;
@@ -1071,20 +1070,40 @@ function fieldKey(sourceId: string, field: string): string {
  * set) separates them. The absolute floor is kept as a guard for small windows, where a couple of
  * repeats can push a tiny value set over the ratio.
  *
- * `functionalDependencies` may be passed in by a caller that already computed them —
- * `detectFunctionalDependencies` is the most expensive detector (O(columns² × sampled rows)).
  */
-function entityKeyFields(
-  sources: Source[],
-  functionalDependencies?: FunctionalDependencyCandidate[],
-): Set<string> {
+function entityKeyFields(sources: Source[], nonKeys: Set<string>): Set<string> {
   const keys = new Set<string>();
-  const fds = functionalDependencies ?? detectFunctionalDependencies(sources);
-  for (const candidate of fds) {
-    const repeatRatio = candidate.rows === 0 ? 0 : candidate.groups / candidate.rows;
-    if (candidate.groups > DEFAULT_MAX_DISTINCT && repeatRatio > DEFAULT_MAX_RATIO) {
-      keys.add(fieldKey(candidate.sourceId, candidate.determinant));
+  const fieldLookup = new Map<string, SourceField>();
+  for (const source of sources) {
+    for (const field of source.fields) {
+      fieldLookup.set(fieldKey(source.id, field.name), field);
     }
+  }
+
+  // Computed uncapped, and deliberately NOT accepted from a caller: `detectFunctionalDependencies`
+  // applies a per-source *display* cap (`MAX_FDS_PER_SOURCE = 3`), and on the real HRSA export
+  // that cap ranked `Health Center Number` out behind three chattier determinants. Feeding the
+  // display list in here would silently starve the org key — the flagship join then grades N:M
+  // ("build a junction table") instead of 1:N, which is exactly what GAP F set out to fix.
+  const fds = detectFunctionalDependencies(sources, { maxPerSource: Number.POSITIVE_INFINITY });
+  for (const candidate of fds) {
+    const key = fieldKey(candidate.sourceId, candidate.determinant);
+    const repeatRatio = candidate.rows === 0 ? 0 : candidate.groups / candidate.rows;
+    if (candidate.groups <= DEFAULT_MAX_DISTINCT || repeatRatio <= DEFAULT_MAX_RATIO) {
+      continue;
+    }
+    // A zip determines its city and state, so it is a textbook determinant — but it keys a value
+    // space, not an entity in this schema.
+    if (nonKeys.has(key)) {
+      continue;
+    }
+    // A determinant must also be an *identifier*. A near-unique free-text column (an address
+    // line, an organization name) determines its row's attributes trivially — but keys nothing.
+    const field = fieldLookup.get(key);
+    if (field && identifierRatio(field) < IDENTIFIER_MIN_RATIO) {
+      continue;
+    }
+    keys.add(key);
   }
   return keys;
 }
@@ -1133,18 +1152,133 @@ function blankRate(source: Source, field: SourceField): number | undefined {
   return stats.blank / scanned;
 }
 
+/** Values a join key is made of: no internal whitespace, not prose-length. */
+const IDENTIFIER_MAX_LENGTH = 32;
+/** How many values to test — identifier-ness is uniform within a column; no need to scan it all. */
+const IDENTIFIER_SAMPLE = 200;
+/** Below this share of identifier-like values, a column is prose and cannot key an entity. */
+const IDENTIFIER_MIN_RATIO = 0.9;
+
 /**
- * The stronger of a candidate's two signals: for a symmetric join max-containment ≥ Jaccard
- * anyway, and for the FK shape it is the containment figure — not the diluted Jaccard — that
- * measures how real the link is. Without this, a containment-admitted FK would sort by its
- * (low) Jaccard and get evicted from the consumers' top-N slices.
+ * Semantic types that are *attributes*, never join keys. A postal code, a phone number, a
+ * lat/long or a money amount can overlap heavily across two files — the real OPAIS/HRSA data has
+ * ~13,000 shared zips — but that overlap is a property of the value space, not a relationship.
+ * Left unfiltered they crowd the FKs out of the consumers' top-N, and a numeric id can even
+ * collide with a zip by coincidence (`ceId ↔ shippingAddresses.zip`, 80% containment, meaningless).
+ * `uuid`/`email`/`url` are NOT listed: those genuinely serve as natural keys.
+ */
+const NON_KEY_SEMANTICS: ReadonlySet<SemanticType> = new Set<SemanticType>([
+  "postal_code",
+  "phone",
+  "latitude",
+  "longitude",
+  "timestamp",
+  "currency_amount",
+]);
+
+/** Fields whose values are an attribute type that cannot be a join key. */
+function nonKeyFields(sources: Source[]): Set<string> {
+  const fields = new Set<string>();
+  for (const finding of detectSemanticTypes(sources)) {
+    if (NON_KEY_SEMANTICS.has(finding.semantic)) {
+      fields.add(fieldKey(finding.sourceId, finding.field));
+    }
+  }
+  return fields;
+}
+
+/**
+ * Share of a column's values that look like *identifiers* rather than prose, [0, 1].
+ *
+ * Cardinality alone cannot tell a key from a description: `Site Name`, `addressLine1` and
+ * `subName` are all high-cardinality and overlap heavily across the real files, so a purely
+ * cardinality-weighted ranking floats free text to the top exactly where the FKs belong. A key is
+ * a code — no spaces, bounded length; a street address or an organization name is neither. Same
+ * intuition as `suggestValueSetKind`'s descriptive test, applied to join ranking.
+ */
+function identifierRatio(field: SourceField): number {
+  const values = fieldValues(field);
+  const limit = Math.min(values.length, IDENTIFIER_SAMPLE);
+  if (limit === 0) {
+    return 1;
+  }
+  let identifierLike = 0;
+  for (let i = 0; i < limit; i += 1) {
+    const value = values[i] ?? "";
+    if (value.length <= IDENTIFIER_MAX_LENGTH && !/\s/.test(value)) {
+      identifierLike += 1;
+    }
+  }
+  return identifierLike / limit;
+}
+
+/**
+ * How key-like a column is: its distinct values as a share of its own table's rows, over the
+ * WIDEST captured sets (`joinValues`, not the ≤1000-row `stats` window, which reports a
+ * near-unique ratio for any column once the window is smaller than the file).
+ *
+ * A real key is near-unique across its table and repeats only because the file is denormalized;
+ * an enum repeats because its value space is closed. On the real HRSA export: `BPHC Assigned
+ * Number` 18855/18855 = 1.0, `Health Center Number` 1527/18855 = 0.081, `Site State Abbreviation`
+ * 59/18855 = 0.003. Returns 1 (neutral — never penalize) when the row count is unknown.
+ */
+function keyness(distinct: number, source: Source, field: SourceField, isNonKey: boolean): number {
+  // A postal code / phone / lat-long is an attribute. Its overlap is real but it is not a link,
+  // so it sorts below everything with any key-likeness at all (still emitted — `probe_join` and
+  // the full candidate list remain the escape hatch).
+  if (isNonKey) {
+    return 0;
+  }
+  return cardinalityKeyness(distinct, source, field) * identifierRatio(field);
+}
+
+/**
+ * Distinct values as a share of the table's rows, measured over the FULL file.
+ *
+ * Entity-key status deliberately does NOT short-circuit this to 1. Being an FD determinant is
+ * evidence about *grain* (GAP F), not about how selective a column is, and granting it free rank
+ * is actively harmful: determinant status is decided on a 200-row even sample, where any column
+ * with more than ~200 distinct values looks near-unique regardless of what it is. On the real
+ * HRSA export that promoted `State FIPS and Congressional District Number Code` (442 values, a
+ * geographic code) and floated its numeric collisions with zip4/pharmacyId/contractId into every
+ * top-N slot. Judged against the whole file it is 442/18855 = 0.023 and sinks, while the org key
+ * (1527/18855 = 0.081) and the NPI column (0.32) stay well clear of the enums (state: 0.003).
+ */
+function cardinalityKeyness(distinct: number, source: Source, field: SourceField): number {
+  const rows = source.rowCount;
+  if (rows !== undefined && rows > 0) {
+    return Math.min(1, distinct / rows);
+  }
+  const stats = field.stats;
+  if (stats && stats.nonEmpty > 0) {
+    return Math.min(1, stats.distinct / stats.nonEmpty);
+  }
+  return 1;
+}
+
+/**
+ * Rank a candidate by containment weighted by how key-like its FK side is.
+ *
+ * Containment alone is the wrong ranking signal, and on the real files it is catastrophically
+ * wrong: a 59-value `state ↔ state` match has 100% containment both ways, while the flagship NPI
+ * bridge has 53%. Ranked on containment, every one of the 8 slots a consumer shows the model was
+ * a state/zip/boolean match — the real bridges ranked #41 (HCN ↔ grantNumber), #60 (BPHC) and #96
+ * (NPI) out of 126, so the model never saw a single one and the evidence pipeline was moot.
+ *
+ * Weighting by the FK side's `keyness` demotes exactly the columns that are shared *because their
+ * value space is closed*, without penalizing a high-cardinality bijection: an 18,855-value 1:1 key
+ * pair keeps keyness 1.0 and still sorts top, while a 59-value enum collapses to ~0.003.
+ *
+ * Known trade (unchanged from the admission gate): a genuine FK into a small dimension table has
+ * low keyness and sorts low. It is still emitted — `probe_join` remains the escape hatch.
  */
 function candidateStrength(candidate: JoinKeyCandidate): number {
-  return Math.max(
+  const containment = Math.max(
     candidate.normalizedOverlap,
     candidate.containmentLeft,
     candidate.containmentRight,
   );
+  return containment * candidate.fkSideKeyness;
 }
 
 function compareRefs(a: FieldRef, b: FieldRef): number {
@@ -1171,8 +1305,6 @@ export type ProbeJoinOptions = {
    * the parent PK's name (`orders.customer_id`) is not mistaken for the parent.
    */
   schema?: Schema;
-  /** Precomputed functional dependencies — see `DetectOptions.functionalDependencies`. */
-  functionalDependencies?: FunctionalDependencyCandidate[];
 };
 
 export type ProbeJoinResult =
@@ -1276,7 +1408,8 @@ export function probeJoin(
   // already marked pk on the canvas — is the "one" side even when the flat source repeats it.
   // `inferGrain` decides whether the flag actually *fires*: raw uniqueness on the other side
   // outranks it, and two flagged sides mean a shared parent, not a 1:1.
-  const entityKeys = entityKeyFields(sources, options?.functionalDependencies);
+  const nonKeys = nonKeyFields(sources);
+  const entityKeys = entityKeyFields(sources, nonKeys);
   const canvasPks = options?.schema ? schemaPkNames(options.schema) : new Set<string>();
   const leftIsEntityKey =
     entityKeys.has(fieldKey(left.source.id, left.field.name)) ||
@@ -1324,7 +1457,8 @@ export function detectJoinKeys(sources: Source[], options?: DetectOptions): Join
   const minContainment = options?.minContainment ?? DEFAULT_MIN_CONTAINMENT;
   // Modeled-entity keys (GAP F): a join against one of these is graded 1:N rather than N:M even
   // when the denormalized source repeats it — subject to `inferGrain`'s precedence rules.
-  const entityKeys = entityKeyFields(sources, options?.functionalDependencies);
+  const nonKeys = nonKeyFields(sources);
+  const entityKeys = entityKeyFields(sources, nonKeys);
 
   const candidates: JoinKeyCandidate[] = [];
 
@@ -1397,6 +1531,20 @@ export function detectJoinKeys(sources: Source[], options?: DetectOptions): Join
             // The classifier must condemn a pair only by the gate that admitted it.
             minContainment,
           });
+          // The FK side is the contained one; its key-likeness is what ranks this candidate.
+          const fkSideKeyness = fkIsLeft
+            ? keyness(
+                left.full.size,
+                leftSource,
+                leftField,
+                nonKeys.has(fieldKey(leftSource.id, leftField.name)),
+              )
+            : keyness(
+                right.full.size,
+                rightSource,
+                rightField,
+                nonKeys.has(fieldKey(rightSource.id, rightField.name)),
+              );
 
           candidates.push({
             left: {
@@ -1417,6 +1565,7 @@ export function detectJoinKeys(sources: Source[], options?: DetectOptions): Join
             requiresNormalization:
               normalizedOverlap - rawOverlap > NORMALIZATION_EPSILON || formatMismatch !== null,
             formatMismatch,
+            fkSideKeyness,
             grain,
             verdict: classification.verdict,
             verdictReason: classification.reason,

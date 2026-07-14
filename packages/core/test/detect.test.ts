@@ -1052,6 +1052,104 @@ describe("schema-aware grain", () => {
   });
 });
 
+/* Ranking: consumers only ever show the model a top-N slice, so rank IS visibility. Pinned from
+ * the real-file smoke check, where ranking on containment alone put a 59-value `state ↔ state`
+ * match (100% containment) above every real bridge — the NPI FK (53%) ranked #96 of 126 and the
+ * model never saw a single genuine link. */
+describe("join candidate ranking", () => {
+  it("ranks a real FK above an enum match with far higher containment", () => {
+    const rows = 500;
+    // A closed value set: 50 codes over 500 rows, fully shared both ways → containment 100%.
+    const codes = Array.from({ length: 50 }, (_, i) => `S${i}`);
+    // A real FK: 300 identifiers, only ~half of which resolve → containment ~53%.
+    const childKeys = Array.from({ length: 300 }, (_, i) => `900${i}`);
+    const parentKeys = Array.from({ length: 600 }, (_, i) => `900${i * 2}`);
+
+    const left: Source = {
+      id: "l",
+      name: "sites.csv",
+      kind: "csv",
+      rowCount: rows,
+      fields: [
+        {
+          name: "state",
+          type: "text",
+          samples: codes.slice(0, 5),
+          distinctValues: codes,
+          stats: { nonEmpty: rows, distinct: 50, blank: 0 },
+        },
+        {
+          name: "npi",
+          type: "text",
+          samples: childKeys.slice(0, 5),
+          distinctValues: childKeys,
+          stats: { nonEmpty: rows, distinct: 300, blank: 0 },
+        },
+      ],
+    };
+    const right: Source = {
+      id: "r",
+      name: "registry.json",
+      kind: "json",
+      rowCount: 600,
+      fields: [
+        {
+          name: "state",
+          type: "text",
+          samples: codes.slice(0, 5),
+          distinctValues: codes,
+          stats: { nonEmpty: 600, distinct: 50, blank: 0 },
+        },
+        {
+          name: "npiNumber",
+          type: "text",
+          samples: parentKeys.slice(0, 5),
+          distinctValues: parentKeys,
+          stats: { nonEmpty: 600, distinct: 600, blank: 0 },
+        },
+      ],
+    };
+
+    const candidates = detectJoinKeys([left, right]);
+    const npiRank = candidates.findIndex((c) => c.left.field === "npi");
+    const stateRank = candidates.findIndex(
+      (c) => c.left.field === "state" && c.right.field === "state",
+    );
+
+    expect(npiRank).toBeGreaterThanOrEqual(0);
+    expect(stateRank).toBeGreaterThanOrEqual(0);
+    // The enum has strictly higher containment, so containment-only ranking inverts these.
+    const enumPair = candidates[stateRank];
+    const fkPair = candidates[npiRank];
+    expect(enumPair?.containmentLeft).toBeGreaterThan(fkPair?.containmentLeft ?? 1);
+    expect(npiRank).toBeLessThan(stateRank);
+
+    // The FK side's key-likeness is what does it: an enum repeats because its value space is
+    // closed (50/500 = 0.1), a key does not (300/500 = 0.6).
+    expect(fkPair?.fkSideKeyness ?? 0).toBeGreaterThan(enumPair?.fkSideKeyness ?? 1);
+  });
+
+  it("sinks an attribute column that cannot be a join key (postal code)", () => {
+    const zips = Array.from({ length: 400 }, (_, i) => String(10000 + i));
+    const zipField = (n: number) => ({
+      name: "zip",
+      type: "text" as const,
+      samples: zips.slice(0, 5),
+      distinctValues: zips,
+      stats: { nonEmpty: n, distinct: 400, blank: 0 },
+    });
+    const left = source("l", "a.csv", [zipField(500)], 500);
+    const right = source("r", "b.csv", [zipField(500)], 500);
+
+    const candidate = detectJoinKeys([left, right]).find((c) => c.left.field === "zip");
+
+    // 100% containment both ways, high cardinality — but a postal code is an attribute, not a
+    // link, and must not outrank real keys just because zips are shared across two files.
+    expect(candidate?.containmentLeft).toBe(1);
+    expect(candidate?.fkSideKeyness).toBe(0);
+  });
+});
+
 /* PR-7 (GAP G): raw probe numbers become a consistent modeling decision — enforceability and
  * representation are separate concerns. */
 describe("classifyRelationship", () => {

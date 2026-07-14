@@ -112,7 +112,12 @@ function summarizeSources(sources: Source[]) {
   });
 }
 
-const MAX_JOIN_FINDINGS = 8;
+// A display budget, not a correctness gate. Sized against the real HRSA+OPAIS pair: with enums and
+// attribute columns demoted by `candidateStrength`, the three genuine bridges land at #1 (NPI), #4
+// (BPHC ↔ siteId) and #9 (org key ↔ grantNumber) — so an 8-slot window still cut the org key by one
+// place. Geographic columns with no semantic matcher (city) still take slots; widen until they can
+// be demoted too.
+const MAX_JOIN_FINDINGS = 12;
 const MAX_PK_FINDINGS = 12;
 const MAX_VALUE_SET_FINDINGS = 10;
 const MAX_SEMANTIC_FINDINGS = 12;
@@ -126,13 +131,12 @@ const MAX_FUNCTIONAL_DEPENDENCY_FINDINGS = 6;
  * Returns null when there is nothing to report (single source, no stats) so the section is omitted.
  */
 function summarizeDetectorFindings(sources: Source[]) {
-  // Computed once and shared: `detectJoinKeys` judges grain against the modeled entity, whose
-  // keys are these determinants (GAP F). It would otherwise re-run the most expensive detector
-  // (O(columns² × sampled rows)) internally. The FULL list is threaded through — the display
-  // slice below must not narrow the evidence the grain is judged against.
+  // This list is for DISPLAY only (per-source capped, then sliced). It must never be fed to
+  // `detectJoinKeys` as the entity-key evidence: the cap dropped the real HRSA org key, which
+  // silently regraded the flagship join. Core recomputes the determinants uncapped for itself.
   const fdCandidates = detectFunctionalDependencies(sources);
 
-  const joins = detectJoinKeys(sources, { functionalDependencies: fdCandidates })
+  const joins = detectJoinKeys(sources)
     .slice(0, MAX_JOIN_FINDINGS)
     .map((candidate) => ({
       left: `${candidate.left.sourceName}.${candidate.left.field}`,
