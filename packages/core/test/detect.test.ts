@@ -350,6 +350,66 @@ describe("detectSemanticTypes", () => {
     ]);
   });
 
+  it("detects geographic place columns (city/region/country)", () => {
+    const src = source("s1", "sites.csv", [
+      valuesField("Site City", "text", ["Chicago", "St. Louis", "Winston-Salem"]),
+      valuesField("Site State Abbreviation", "text", ["IL", "MO", "NC"]),
+      valuesField("country", "text", ["United States", "Canada", "Mexico"]),
+    ]);
+
+    const semantics = Object.fromEntries(
+      detectSemanticTypes([src]).map((finding) => [finding.field, finding.semantic]),
+    );
+
+    expect(semantics).toEqual({
+      "Site City": "city",
+      "Site State Abbreviation": "region",
+      country: "country",
+    });
+  });
+
+  it("reads a numeric FIPS column as geo_code, not as a region", () => {
+    // The name matches the `region` hint ("State and County…"), but the values are digits, so it
+    // must fall through the alphabetic place-name test to the numeric administrative-code matcher.
+    const src = source("s1", "sites.csv", [
+      valuesField("State and County Federal Information Processing Standard Code", "text", [
+        "17031",
+        "29510",
+        "37067",
+      ]),
+      valuesField("Congressional District Code", "text", ["0601", "1203", "3607"]),
+    ]);
+
+    const semantics = detectSemanticTypes([src]).map((finding) => finding.semantic);
+
+    expect(semantics).toEqual(["geo_code", "geo_code"]);
+  });
+
+  it("reads a ZIP+4 extension and a phone extension as their attribute types", () => {
+    // Both are short digit runs that would otherwise read as high-cardinality numeric keys and
+    // collide with real ids. Their name hints are what make the short-value tests safe.
+    const src = source("s1", "orgs.json", [
+      valuesField("zip4", "text", ["1234", "5678", "9012"]),
+      valuesField("phoneNumberExtension", "text", ["101", "2045", "88"]),
+    ]);
+
+    const semantics = Object.fromEntries(
+      detectSemanticTypes([src]).map((finding) => [finding.field, finding.semantic]),
+    );
+
+    expect(semantics).toEqual({ zip4: "postal_code", phoneNumberExtension: "phone" });
+  });
+
+  it("does not treat a plain id column as geography just because its values are short digits", () => {
+    // The name hints are the whole safety net: no hint, no attribute semantic.
+    const src = source("s1", "orders.csv", [
+      valuesField("order_code", "text", ["1234", "5678", "9012"]),
+      valuesField("status", "text", ["Chicago", "St. Louis", "Winston-Salem"]),
+    ]);
+
+    expect(detectSemanticTypes([src])).toEqual([]);
+  });
+
   it("detects latitude/longitude pairs only with a corroborating name", () => {
     const src = source("s1", "stores.csv", [
       valuesField("latitude", "numeric", ["40.7128", "34.0522", "-33.8688"]),
@@ -1127,6 +1187,72 @@ describe("join candidate ranking", () => {
     // The FK side's key-likeness is what does it: an enum repeats because its value space is
     // closed (50/500 = 0.1), a key does not (300/500 = 0.6).
     expect(fkPair?.fkSideKeyness ?? 0).toBeGreaterThan(enumPair?.fkSideKeyness ?? 1);
+  });
+
+  it("sinks a high-cardinality city column below a real FK", () => {
+    // City is the case an enum floor cannot catch: two health-center exports share ~4,000 city
+    // names, and a city column is high-cardinality AND identifier-shaped ("Chicago"), so only its
+    // semantic type demotes it. Before the geographic types it took 4 of the visible slots.
+    // Alphabetic: a place name never carries digits, and the matcher rightly rejects one that does.
+    const letter = (i: number) => String.fromCharCode(97 + (i % 26));
+    const cities = Array.from(
+      { length: 300 },
+      (_, i) => `Spring${letter(Math.floor(i / 26))}${letter(i)}`,
+    );
+    const childKeys = Array.from({ length: 300 }, (_, i) => `900${i}`);
+    const parentKeys = Array.from({ length: 600 }, (_, i) => `900${i * 2}`);
+    const left = source(
+      "l",
+      "sites.csv",
+      [
+        {
+          name: "Site City",
+          type: "text",
+          samples: cities.slice(0, 5),
+          distinctValues: cities,
+          stats: { nonEmpty: 500, distinct: 300, blank: 0 },
+        },
+        {
+          name: "npi",
+          type: "text",
+          samples: childKeys.slice(0, 5),
+          distinctValues: childKeys,
+          stats: { nonEmpty: 500, distinct: 300, blank: 0 },
+        },
+      ],
+      500,
+    );
+    const right = source(
+      "r",
+      "registry.json",
+      [
+        {
+          name: "city",
+          type: "text",
+          samples: cities.slice(0, 5),
+          distinctValues: cities,
+          stats: { nonEmpty: 600, distinct: 300, blank: 0 },
+        },
+        {
+          name: "npiNumber",
+          type: "text",
+          samples: parentKeys.slice(0, 5),
+          distinctValues: parentKeys,
+          stats: { nonEmpty: 600, distinct: 600, blank: 0 },
+        },
+      ],
+      600,
+    );
+
+    const candidates = detectJoinKeys([left, right]);
+    const cityPair = candidates.find((c) => c.left.field === "Site City");
+    const fkPair = candidates.find((c) => c.left.field === "npi");
+
+    // The city pair has 100% containment — strictly better than the FK's ~53% — and is not an
+    // enum. Only its semantic type keeps it out of the window.
+    expect(cityPair?.containmentLeft).toBe(1);
+    expect(cityPair?.fkSideKeyness).toBe(0);
+    expect(candidates.indexOf(fkPair!)).toBeLessThan(candidates.indexOf(cityPair!));
   });
 
   it("sinks an attribute column that cannot be a join key (postal code)", () => {

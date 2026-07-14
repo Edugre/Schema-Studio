@@ -787,7 +787,15 @@ export type SemanticType =
   | "currency_amount"
   | "postal_code"
   | "latitude"
-  | "longitude";
+  | "longitude"
+  // Geographic place/administrative columns. They are attributes of a row, never links between
+  // files: two health-center exports share ~4,000 city names and all 50 state codes, and those
+  // overlaps say nothing about how the files relate. Naming them lets the join ranking sink them
+  // (`NON_KEY_SEMANTICS`) instead of letting them crowd real FKs out of the top-N.
+  | "city"
+  | "region"
+  | "country"
+  | "geo_code";
 
 export type SemanticTypeFinding = {
   sourceId: string;
@@ -807,6 +815,12 @@ export type SemanticTypeOptions = {
 
 const DEFAULT_MIN_MATCH_RATE = 0.9;
 const DEFAULT_MIN_SEMANTIC_VALUES = 3;
+
+/** A place name: letters and the punctuation of "St. Louis" / "Winston-Salem" — never digits. */
+function isPlaceName(value: string): boolean {
+  const trimmed = value.trim();
+  return trimmed.length > 0 && trimmed.length <= 60 && /^[\p{L}][\p{L} .'-]*$/u.test(trimmed);
+}
 
 function isFiniteInRange(value: string, min: number, max: number): boolean {
   if (!/^-?\d+(\.\d+)?$/.test(value.trim())) {
@@ -858,17 +872,56 @@ const SEMANTIC_MATCHERS: Array<{
     test: (value) => isFiniteInRange(value, -180, 180),
   },
   {
+    // 4 digits covers the bare ZIP+4 extension, which real exports carry as its own `zip4`
+    // column. Without it the column misses this matcher, reads as a high-cardinality numeric
+    // key, and its coincidental collisions with `pharmacyId`/`contractId` take findings slots.
+    // Safe because the name hint gates it: a plain id column is never called "zip" or "postal".
     semantic: "postal_code",
     nameHint: /zip|postal/i,
-    test: (value) => /^\d{5}(-\d{4})?$/.test(value.trim()),
+    test: (value) => /^\d{4,5}(-\d{4})?$/.test(value.trim()),
   },
   {
+    // The ≥7-digit floor is what stops a bare digit run from reading as a phone number, but a
+    // phone *extension* is 2-5 digits and would fail it — leaving `phoneNumberExtension` to read
+    // as a high-cardinality numeric key that collides with zip4/pharmacyId. The name hint already
+    // establishes it is telephony, so a short digit run is admitted only when the name says so.
     semantic: "phone",
     nameHint: /phone|mobile|tel|fax/i,
     test: (value) => {
       const trimmed = value.trim();
-      return /^\+?[0-9()\s.-]{7,20}$/.test(trimmed) && (trimmed.match(/\d/g)?.length ?? 0) >= 7;
+      if (!/^\+?[0-9()\s.-]{1,20}$/.test(trimmed)) {
+        return false;
+      }
+      const digits = trimmed.match(/\d/g)?.length ?? 0;
+      // A full number (≥7 digits), or a short extension (a handful of digits, nothing else).
+      return digits >= 7 || (digits >= 1 && trimmed.length <= 6);
     },
+  },
+  // A place NAME: letters, spaces and the punctuation of "St. Louis" / "Winston-Salem". The
+  // alphabetic test is what keeps these from swallowing codes — "State and County FIPS Code"
+  // matches the `region` name hint but holds digits, so it falls through to `geo_code` below.
+  {
+    semantic: "city",
+    nameHint: /\b(city|town|municipality)\b/i,
+    test: isPlaceName,
+  },
+  {
+    semantic: "region",
+    nameHint: /\b(state|province|region|county)\b/i,
+    test: isPlaceName,
+  },
+  {
+    semantic: "country",
+    nameHint: /\b(country|nation)\b/i,
+    test: isPlaceName,
+  },
+  // A numeric administrative code (FIPS, census tract, congressional district). These collide
+  // with real numeric ids by pure coincidence — on the real HRSA/OPAIS pair a FIPS+district code
+  // matched `zip4`, `pharmacyId` and `contractId` well enough to take most of the findings window.
+  {
+    semantic: "geo_code",
+    nameHint: /\b(fips|census|tract|congressional district)\b|federal information processing/i,
+    test: (value) => /^\d{1,11}$/.test(value.trim()),
   },
 ];
 
@@ -1174,6 +1227,12 @@ const NON_KEY_SEMANTICS: ReadonlySet<SemanticType> = new Set<SemanticType>([
   "longitude",
   "timestamp",
   "currency_amount",
+  // Geography is an attribute of a row, not a link between files. Two health-center exports share
+  // ~4,000 city names and every state code; ranked on overlap those beat every real FK.
+  "city",
+  "region",
+  "country",
+  "geo_code",
 ]);
 
 /** Fields whose values are an attribute type that cannot be a join key. */

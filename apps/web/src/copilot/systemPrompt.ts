@@ -112,12 +112,12 @@ function summarizeSources(sources: Source[]) {
   });
 }
 
-// A display budget, not a correctness gate. Sized against the real HRSA+OPAIS pair: with enums and
-// attribute columns demoted by `candidateStrength`, the three genuine bridges land at #1 (NPI), #4
-// (BPHC ↔ siteId) and #9 (org key ↔ grantNumber) — so an 8-slot window still cut the org key by one
-// place. Geographic columns with no semantic matcher (city) still take slots; widen until they can
-// be demoted too.
-const MAX_JOIN_FINDINGS = 12;
+// A display budget, not a correctness gate. Verified against the real HRSA+OPAIS pair: with enums,
+// geography and attribute columns demoted by `candidateStrength`, the genuine bridges occupy the
+// top five slots (NPI, BPHC ↔ siteId, ceId ↔ pharmacyId, org key ↔ grantNumber, BHCMIS ↔ ceId), so
+// 8 shows every real link with room to spare. Widen only if a real bridge is being cut — a window
+// that has to be widened to fit the signal is a ranking bug, not a budget problem.
+const MAX_JOIN_FINDINGS = 8;
 const MAX_PK_FINDINGS = 12;
 const MAX_VALUE_SET_FINDINGS = 10;
 const MAX_SEMANTIC_FINDINGS = 12;
