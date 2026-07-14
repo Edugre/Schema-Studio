@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { FieldStats, Source, SourceField } from "../src/parse/types.js";
 import {
+  classifyRelationship,
   detectFormatMismatch,
   detectFunctionalDependencies,
   detectJoinKeys,
@@ -50,7 +51,8 @@ describe("detectFormatMismatch", () => {
     const mismatch = detectFormatMismatch(left, right);
 
     expect(mismatch?.issues).toEqual(["case_mismatch"]);
-    expect(mismatch?.note).toBe("normalize letter case");
+    expect(mismatch?.note).toBe("normalize letter case (+3 matches)");
+    expect(mismatch?.gains).toEqual({ case_mismatch: 3 });
   });
 
   it("flags surrounding whitespace", () => {
@@ -789,5 +791,335 @@ describe("sampling boundary (boundary_mini)", () => {
     const [candidate] = detectJoinKeys([child, parent]);
     expect(candidate?.containmentLeft).toBe(1);
     expect(candidate?.sharedValues).toBe(600);
+  });
+});
+
+/* PR-6 (GAP F): grain is judged against the modeled entity, not the flat source column. */
+describe("schema-aware grain", () => {
+  const dup: FieldStats = { nonEmpty: 24, distinct: 8, blank: 0 };
+
+  it("inferGrain treats an entity-key side as 'one' despite flat-file repeats", () => {
+    const orgKey = statField("org_id", "text", ["H1", "H2", "H3"], dup);
+    const factKey = statField("grant", "text", ["H1", "H2", "H3"], dup);
+
+    // Raw stats say both repeat → N:M; the key context corrects the modeled side.
+    expect(inferGrain(orgKey, factKey)).toBe("N:M");
+    expect(inferGrain(orgKey, factKey, { leftIsEntityKey: true })).toBe("1:N");
+    expect(inferGrain(orgKey, factKey, { rightIsEntityKey: true })).toBe("N:1");
+  });
+
+  it("inferGrain promotes NEITHER side when both key an entity — a shared parent, not a 1:1", () => {
+    // The real HRSA↔OPAIS shape: `Health Center Number` determines the org columns in the CSV
+    // and `grantNumber` determines the grant columns in the JSON, so both are entity keys and
+    // both repeat. Promoting both would read 1:1 — a fabricated cardinality. They key the SAME
+    // entity, so the honest grain is N:M and the classifier calls it `shared_parent`.
+    const hcn = statField("Health Center Number", "text", ["H1", "H2"], dup);
+    const grant = statField("grantNumber", "text", ["H1", "H2"], dup);
+
+    expect(inferGrain(hcn, grant, { leftIsEntityKey: true, rightIsEntityKey: true })).toBe("N:M");
+  });
+
+  it("inferGrain never promotes an entity key against a genuinely unique side", () => {
+    // The universal FK convention: customers.customer_id is a real PK, orders.customer_id is the
+    // child's repeating FK. A canvas PK named `customer_id` flags the CHILD column by name — but
+    // raw uniqueness on the parent outranks that, so the grain stays N:1 and does not read 1:1.
+    const childFk = statField("customer_id", "text", ["c1", "c2"], dup);
+    const parentPk = statField("customer_id", "text", ["c1", "c2"], {
+      nonEmpty: 8,
+      distinct: 8,
+      blank: 0,
+    });
+
+    expect(inferGrain(childFk, parentPk, { leftIsEntityKey: true })).toBe("N:1");
+    expect(inferGrain(childFk, parentPk, { leftIsEntityKey: true, rightIsEntityKey: true })).toBe(
+      "N:1",
+    );
+  });
+
+  // 16 orgs: an entity key must clear the value-set cardinality ceiling (12), so an 8-value
+  // determinant would (correctly) read as an enum rather than an entity.
+  const orgIds = Array.from({ length: 16 }, (_, i) => `H8${i}`);
+
+  /** The denormalized HRSA CSV: the org key repeats once per site and determines the org columns. */
+  function hrsaSource(): Source {
+    const rows: string[][] = [];
+    for (const [i, orgId] of orgIds.entries()) {
+      for (let site = 0; site < 3; site += 1) {
+        rows.push([orgId, `Org ${i}`]);
+      }
+    }
+    return {
+      id: "h",
+      name: "hrsa.csv",
+      kind: "csv",
+      rowCount: 48,
+      fields: [
+        {
+          name: "Health Center Number",
+          type: "text",
+          samples: orgIds.slice(0, 5),
+          distinctValues: orgIds,
+          stats: { nonEmpty: 48, distinct: 16, blank: 0 },
+        },
+        {
+          name: "Grantee Org Name",
+          type: "text",
+          samples: ["Org 0"],
+          distinctValues: orgIds.map((_, i) => `Org ${i}`),
+          stats: { nonEmpty: 48, distinct: 16, blank: 0 },
+        },
+      ],
+      sampleRows: rows,
+    };
+  }
+
+  it("detectJoinKeys grades an FD-determinant ↔ fact-key pair 1:N, not N:M (HRSA regression)", () => {
+    // The org key *determines* the org-level columns — it keys the organization entity an FD
+    // split would extract — so its join against the OPAIS grant column (genuinely repeating:
+    // many covered entities per grant, and NOT itself a determinant) is 1:N, not N:M.
+    const opais = source("o", "opais.json", [
+      {
+        name: "grantNumber",
+        type: "text",
+        samples: orgIds.slice(0, 5),
+        distinctValues: orgIds,
+        stats: { nonEmpty: 40, distinct: 16, blank: 0 },
+      },
+    ]);
+
+    const candidate = detectJoinKeys([hrsaSource(), opais]).find(
+      (entry) => entry.left.field === "Health Center Number" && entry.right.field === "grantNumber",
+    );
+
+    expect(candidate).toBeDefined();
+    expect(candidate?.grain).toBe("1:N");
+    // Full mutual containment, no blanks over the whole file → an enforceable FK.
+    expect(candidate?.verdict).toBe("enforced_fk");
+  });
+
+  it("calls a both-sides-determinant pair shared_parent, not 1:1 (the real HRSA↔OPAIS shape)", () => {
+    // Unlike the case above, OPAIS here carries its own row tuples and `grantNumber` determines
+    // the grant-level columns denormalized into it. Both columns now key an entity and both
+    // repeat — they key the SAME entity. Promoting both would fabricate a 1:1.
+    const opaisRows: string[][] = [];
+    for (const [i, orgId] of orgIds.entries()) {
+      for (let entity = 0; entity < 3; entity += 1) {
+        opaisRows.push([orgId, `Grant ${i}`]);
+      }
+    }
+    const opais: Source = {
+      id: "o",
+      name: "opais.json",
+      kind: "json",
+      rowCount: 48,
+      fields: [
+        {
+          name: "grantNumber",
+          type: "text",
+          samples: orgIds.slice(0, 5),
+          distinctValues: orgIds,
+          stats: { nonEmpty: 48, distinct: 16, blank: 0 },
+        },
+        {
+          name: "grantName",
+          type: "text",
+          samples: ["Grant 0"],
+          distinctValues: orgIds.map((_, i) => `Grant ${i}`),
+          stats: { nonEmpty: 48, distinct: 16, blank: 0 },
+        },
+      ],
+      sampleRows: opaisRows,
+    };
+
+    const candidate = detectJoinKeys([hrsaSource(), opais]).find(
+      (entry) => entry.left.field === "Health Center Number" && entry.right.field === "grantNumber",
+    );
+
+    expect(candidate?.grain).toBe("N:M");
+    expect(candidate?.verdict).toBe("shared_parent");
+    expect(candidate?.verdictReason).toContain("key the same entity");
+  });
+
+  it("does not treat a low-cardinality determinant as an entity key (enum floor)", () => {
+    // `state` determines `state_name`, so it is an FD determinant — but with 5 values it is a
+    // lookup, not an entity whose key should flip a join's grain. Both sides must stay "many".
+    const states = ["CA", "TX", "NY", "WA", "OR"];
+    const rows: string[][] = [];
+    for (let i = 0; i < 24; i += 1) {
+      const code = states[i % states.length] ?? "CA";
+      rows.push([code, `${code} full name`]);
+    }
+    const left: Source = {
+      id: "l",
+      name: "orders.csv",
+      kind: "csv",
+      rowCount: 24,
+      fields: [
+        {
+          name: "state",
+          type: "text",
+          samples: states,
+          distinctValues: states,
+          stats: { nonEmpty: 24, distinct: 5, blank: 0 },
+        },
+        {
+          name: "state_name",
+          type: "text",
+          samples: ["CA full name"],
+          distinctValues: states.map((code) => `${code} full name`),
+          stats: { nonEmpty: 24, distinct: 5, blank: 0 },
+        },
+      ],
+      sampleRows: rows,
+    };
+    const right = source("r", "shipments.csv", [
+      {
+        name: "state",
+        type: "text",
+        samples: states,
+        distinctValues: states,
+        stats: { nonEmpty: 30, distinct: 5, blank: 0 },
+      },
+    ]);
+
+    const candidate = detectJoinKeys([left, right]).find(
+      (entry) => entry.left.field === "state" && entry.right.field === "state",
+    );
+
+    // Admitted via the Jaccard path (identical value sets), but graded honestly: an incidental
+    // enum match, not an FK into a 5-row "state" entity.
+    expect(candidate?.grain).toBe("N:M");
+    expect(candidate?.verdict).toBe("junction");
+  });
+});
+
+/* PR-7 (GAP G): raw probe numbers become a consistent modeling decision — enforceability and
+ * representation are separate concerns. */
+describe("classifyRelationship", () => {
+  it("models the partial-coverage HRSA pair as a nullable FK, never a dropped edge", () => {
+    const result = classifyRelationship({
+      containmentLeft: 0.96,
+      containmentRight: 0.42,
+      grain: "1:N",
+    });
+
+    expect(result.verdict).toBe("nullable_fk");
+    expect(result.reason).toContain("96%");
+    expect(result.reason).toContain("still represent");
+  });
+
+  it("returns no_link for a near-zero-overlap decoy", () => {
+    const result = classifyRelationship({
+      containmentLeft: 0.02,
+      containmentRight: 0.01,
+      grain: "unknown",
+    });
+    expect(result.verdict).toBe("no_link");
+  });
+
+  it("returns junction for a well-covered N:M pair", () => {
+    const result = classifyRelationship({
+      containmentLeft: 0.8,
+      containmentRight: 0.3,
+      grain: "N:M",
+    });
+    expect(result.verdict).toBe("junction");
+    expect(result.reason).toContain("junction table");
+  });
+
+  it("returns not_valid_fk for weak-but-nonzero coverage", () => {
+    const result = classifyRelationship({
+      containmentLeft: 0.2,
+      containmentRight: 0.1,
+      grain: "1:N",
+    });
+    expect(result.verdict).toBe("not_valid_fk");
+  });
+
+  it("returns enforced_fk only when every FK-side key resolves and none are blank", () => {
+    const full = { containmentLeft: 1, containmentRight: 0.2, grain: "N:1" as const };
+
+    expect(classifyRelationship({ ...full, nullRate: 0 }).verdict).toBe("enforced_fk");
+
+    const withBlanks = classifyRelationship({ ...full, nullRate: 0.25 });
+    expect(withBlanks.verdict).toBe("nullable_fk");
+    expect(withBlanks.reason).toContain("25%");
+  });
+
+  it("carries the normalization note into the reason", () => {
+    const result = classifyRelationship({
+      containmentLeft: 0.9,
+      containmentRight: 0.4,
+      grain: "1:N",
+      formatMismatch: {
+        issues: ["leading_zeros"],
+        gains: { leading_zeros: 39 },
+        note: "strip leading zeros (+39 matches)",
+      },
+    });
+    expect(result.reason).toContain("strip leading zeros (+39 matches)");
+  });
+
+  it("will not certify an enforceable FK from an unverified blank rate", () => {
+    // `nullRate: undefined` means the blank count was never verified over the whole file (no
+    // stats, or a 1000-row window on a 50k-row column). That is not the same as zero: a column
+    // fully populated in its first 1000 rows can be 30% blank thereafter, and a NOT NULL FK
+    // would be exported against data that violates it.
+    const unverified = classifyRelationship({
+      containmentLeft: 1,
+      containmentRight: 0.2,
+      grain: "N:1",
+    });
+
+    expect(unverified.verdict).toBe("nullable_fk");
+    expect(unverified.reason).toContain("blank rate unverified");
+  });
+
+  it("will not certify an enforceable FK when the grain is unknown", () => {
+    // No uniqueness evidence on either side (too few rows) — full containment alone is not an FK.
+    const result = classifyRelationship({
+      containmentLeft: 1,
+      containmentRight: 0.2,
+      grain: "unknown",
+      nullRate: 0,
+    });
+
+    expect(result.verdict).toBe("nullable_fk");
+    expect(result.reason).toContain("grain unknown");
+  });
+
+  it("condemns a pair only by the gate that admitted it", () => {
+    const weak = { containmentLeft: 0.3, containmentRight: 0.1, grain: "1:N" as const };
+
+    // Default gate (0.4): 30% is too weak for FK semantics.
+    expect(classifyRelationship(weak).verdict).toBe("not_valid_fk");
+    // A caller that deliberately lowered the admission gate must not have its own candidate
+    // condemned by the classifier's default.
+    expect(classifyRelationship({ ...weak, minContainment: 0.25 }).verdict).toBe("nullable_fk");
+  });
+
+  it("returns shared_parent when both sides key the same entity", () => {
+    const result = classifyRelationship({
+      containmentLeft: 0.96,
+      containmentRight: 0.42,
+      grain: "N:M",
+      bothSidesKeyEntity: true,
+    });
+
+    expect(result.verdict).toBe("shared_parent");
+    expect(result.reason).toContain("extract that entity");
+  });
+});
+
+describe("detectFormatMismatch marginal gains", () => {
+  it("quantifies each normalizer's marginal shared-value gain", () => {
+    const hrsa = field("npi", "text", ["01234", "00078", "05500", "match"]);
+    const opais = field("npi", "text", ["1234", "78", "5500", "match"]);
+
+    const mismatch = detectFormatMismatch(hrsa, opais);
+
+    // 1 raw match; stripping leading zeros recovers the other 3.
+    expect(mismatch?.gains).toEqual({ leading_zeros: 3 });
+    expect(mismatch?.note).toBe("strip leading zeros (+3 matches)");
   });
 });

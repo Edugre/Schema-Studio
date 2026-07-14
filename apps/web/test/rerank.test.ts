@@ -25,6 +25,8 @@ function fkItem(id: string, overlapPercent = 50, warning: string | null = null):
       requiresNormalization: warning !== null,
       formatMismatch: null,
       grain: "1:N",
+      verdict: "nullable_fk",
+      verdictReason: "partial coverage — still represent the relationship",
     },
     leftLabel: "left.csv · a",
     rightLabel: "right.csv · b",
