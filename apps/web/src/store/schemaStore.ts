@@ -508,9 +508,14 @@ export function createSchemaStore(options?: CreateSchemaStoreOptions) {
           });
         },
 
+        // Removing a JSON parent also removes the children unnested from its array fields: they
+        // exist only as part of that file, and a child whose parent is gone loses the lineage its
+        // `_parentId` link depends on. Mirrors `addSources` — one file in, one file out, one undo.
         removeSource: (sourceId) => {
           commitSnapshot((draft) => {
-            draft.sources = draft.sources.filter((source) => source.id !== sourceId);
+            draft.sources = draft.sources.filter(
+              (source) => source.id !== sourceId && source.derivedFrom?.parentId !== sourceId,
+            );
           });
         },
 

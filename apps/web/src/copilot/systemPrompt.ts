@@ -208,6 +208,38 @@ function summarizeDetectorFindings(sources: Source[]) {
   return { joins, primaryKeys, valueSets, semantics, compositeKeys, functionalDependencies };
 }
 
+type DetectorFindings = ReturnType<typeof summarizeDetectorFindings>;
+
+/**
+ * The detector pass normalizes and intersects the wide join-value sets across every column pair —
+ * comfortably a second on real uploads — and it depends only on the parsed sources. Every agent
+ * round rebuilds this prompt with the *same* sources (only the schema moves), so cache the result
+ * per source array. The store replaces `sources` on any upload/removal, so array identity is a
+ * sound key: a stale entry is unreachable, and a fresh array recomputes.
+ */
+const findingsCache = new WeakMap<Source[], { value: DetectorFindings }>();
+
+function cachedDetectorFindings(sources: Source[]): DetectorFindings {
+  const hit = findingsCache.get(sources);
+  if (hit) {
+    return hit.value;
+  }
+  const value = summarizeDetectorFindings(sources);
+  findingsCache.set(sources, { value });
+  return value;
+}
+
+/**
+ * Populate the cache for `sources` ahead of the first send. Measured at ~3.7s on the real
+ * HRSA + OPAIS pair, this pass is the single most expensive thing the copilot does, and it is
+ * pure: running it while the user is still reading the canvas costs them nothing, whereas running
+ * it on the send path costs them the whole wait. Callers should schedule this off the critical
+ * path (`requestIdleCallback`). No-op once warm.
+ */
+export function warmDetectorFindings(sources: Source[]): void {
+  cachedDetectorFindings(sources);
+}
+
 const ACTION_PROTOCOL = `Allowed action ops (use table/field NAMES, not internal ids):
 - add_table: { "op": "add_table", "name": string, "x"?: number, "y"?: number, "fields"?: [{ "name", "type", "pk"?, "fk"? }] }
 - add_field: { "op": "add_field", "table": string, "name": string, "type": string, "pk"?: boolean, "fk"?: boolean }
@@ -378,7 +410,7 @@ export function buildStaticInstructions(targetId: TargetId = DEFAULT_TARGET): st
  * it after the cached static block.
  */
 export function buildDynamicContext(schema: Schema, sources: Source[]): string {
-  const findings = summarizeDetectorFindings(sources);
+  const findings = cachedDetectorFindings(sources);
 
   return [
     "<current_schema>",

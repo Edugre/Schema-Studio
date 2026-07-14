@@ -1,9 +1,10 @@
-import { ParseError } from "@grafture/core";
-import { useCallback, useRef, useState, type DragEvent, type ReactNode } from "react";
+import { ParseError, type Source } from "@grafture/core";
+import { useCallback, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 
 import { useSchemaStore } from "../store/index.js";
-import { ChevronDownIcon, FileIcon, PanelOpenIcon, PlusIcon } from "../ui/icons.js";
+import { BranchIcon, ChevronDownIcon, FileIcon, PanelOpenIcon, PlusIcon } from "../ui/icons.js";
 import { addSourceFieldToTable, buildTableFromSource, formatSample } from "./buildFromSource.js";
+import { childLabel, groupSources } from "./groupSources.js";
 import "./SourcesPanel.css";
 import { readAndParseFile } from "./readAndParse.js";
 
@@ -18,9 +19,12 @@ function rejectionSummary(rejected: Array<{ reason: string }>): string {
 function SourceCard({
   sourceId,
   name,
+  title,
   kind,
   fieldCount,
   rowCount,
+  nestedCount = 0,
+  nested = false,
   expanded,
   onToggle,
   onBuildTable,
@@ -29,9 +33,15 @@ function SourceCard({
 }: {
   sourceId: string;
   name: string;
+  /** Full source name for the tooltip — a nested card shows only its JSON key as `name`. */
+  title: string;
   kind: string;
   fieldCount: number;
   rowCount: number | undefined;
+  /** Child sources unnested from this one; shown as a count so a collapsed group still says so. */
+  nestedCount?: number;
+  /** A child source, rendered indented under its parent. */
+  nested?: boolean;
   expanded: boolean;
   onToggle: () => void;
   onBuildTable: () => void;
@@ -39,17 +49,20 @@ function SourceCard({
   children: ReactNode;
 }) {
   const meta = [
-    kind.toUpperCase(),
+    ...(nested ? [] : [kind.toUpperCase()]),
     `${fieldCount} fields`,
     // Sources parsed before rowCount existed simply omit the segment.
     ...(rowCount !== undefined
       ? [`${rowCount.toLocaleString()} ${rowCount === 1 ? "row" : "rows"}`]
       : []),
+    ...(nestedCount > 0 ? [`${nestedCount} nested`] : []),
   ].join(" · ");
 
   return (
     <article
-      className={`sources-panel__source${expanded ? " is-expanded" : ""}`}
+      className={`sources-panel__source${expanded ? " is-expanded" : ""}${
+        nested ? " sources-panel__source--nested" : ""
+      }`}
       data-source-id={sourceId}
     >
       <button
@@ -59,10 +72,10 @@ function SourceCard({
         aria-expanded={expanded}
       >
         <span className="sources-panel__source-icon">
-          <FileIcon size={16} />
+          {nested ? <BranchIcon size={16} /> : <FileIcon size={16} />}
         </span>
         <span className="sources-panel__source-meta">
-          <span className="sources-panel__source-name" title={name}>
+          <span className="sources-panel__source-name" title={title}>
             {name}
           </span>
           <span className="sources-panel__source-kind">{meta}</span>
@@ -80,7 +93,7 @@ function SourceCard({
               type="button"
               className="sources-panel__button sources-panel__button--ghost"
               onClick={onRemove}
-              aria-label={`Remove ${name}`}
+              aria-label={`Remove ${title}`}
             >
               Remove
             </button>
@@ -120,6 +133,10 @@ export function SourcesPanel({
   const activeTable = selection.tableId
     ? schema.tables.find((table) => table.id === selection.tableId)
     : undefined;
+
+  // One card per uploaded file, with the sources unnested from a JSON file's array fields nested
+  // under it. The panel's file count follows the groups, not the raw source count.
+  const groups = useMemo(() => groupSources(sources), [sources]);
 
   const toggleSource = (sourceId: string) => {
     setExpandedSourceId((current) => (current === sourceId ? null : sourceId));
@@ -258,6 +275,54 @@ export function SourcesPanel({
     void ingestFiles(event.dataTransfer.files);
   };
 
+  /** One source card with its clickable field list. Parent and nested cards render identically. */
+  const renderCard = (source: Source, opts: { nested?: boolean; nestedCount?: number }) => (
+    <SourceCard
+      key={source.id}
+      sourceId={source.id}
+      name={opts.nested ? childLabel(source) : source.name}
+      title={source.name}
+      kind={source.kind}
+      fieldCount={source.fields.length}
+      rowCount={source.rowCount}
+      {...(opts.nested ? { nested: true } : {})}
+      {...(opts.nestedCount ? { nestedCount: opts.nestedCount } : {})}
+      expanded={expandedSourceId === source.id}
+      onToggle={() => toggleSource(source.id)}
+      onBuildTable={() => handleBuildTable(source.id)}
+      onRemove={() => removeSource(source.id)}
+    >
+      <ul className="sources-panel__fields">
+        {source.fields.map((field, index) => {
+          const sample = formatSample(field);
+
+          return (
+            <li key={field.name}>
+              <button
+                type="button"
+                className="sources-panel__field"
+                disabled={!selection.tableId}
+                title={
+                  selection.tableId
+                    ? `Add ${field.name} to ${activeTable?.name ?? "active table"}`
+                    : "Select an active table first"
+                }
+                onClick={() => handleAddField(source.id, field.name)}
+              >
+                <span className={`sources-panel__dot${index === 0 ? " is-pk" : ""}`} aria-hidden />
+                <span className="sources-panel__field-name">{field.name}</span>
+                <span className="sources-panel__field-type">{field.type}</span>
+                <span className="sources-panel__field-sample">
+                  {sample !== null ? sample : "—"}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </SourceCard>
+  );
+
   if (collapsed) {
     return (
       <aside className="panel panel-rail">
@@ -287,7 +352,7 @@ export function SourcesPanel({
         <div className="sources-panel__title-group">
           <h1 className="sources-panel__title">Sources</h1>
           <span className="sources-panel__subtitle">
-            {sources.length} {sources.length === 1 ? "file" : "files"}
+            {groups.length} {groups.length === 1 ? "file" : "files"}
           </span>
         </div>
         <div className="sources-panel__header-actions">
@@ -371,51 +436,15 @@ export function SourcesPanel({
             No sources yet. Upload a file to inspect its fields.
           </p>
         ) : (
-          sources.map((source) => (
-            <SourceCard
-              key={source.id}
-              sourceId={source.id}
-              name={source.name}
-              kind={source.kind}
-              fieldCount={source.fields.length}
-              rowCount={source.rowCount}
-              expanded={expandedSourceId === source.id}
-              onToggle={() => toggleSource(source.id)}
-              onBuildTable={() => handleBuildTable(source.id)}
-              onRemove={() => removeSource(source.id)}
-            >
-              <ul className="sources-panel__fields">
-                {source.fields.map((field, index) => {
-                  const sample = formatSample(field);
-
-                  return (
-                    <li key={field.name}>
-                      <button
-                        type="button"
-                        className="sources-panel__field"
-                        disabled={!selection.tableId}
-                        title={
-                          selection.tableId
-                            ? `Add ${field.name} to ${activeTable?.name ?? "active table"}`
-                            : "Select an active table first"
-                        }
-                        onClick={() => handleAddField(source.id, field.name)}
-                      >
-                        <span
-                          className={`sources-panel__dot${index === 0 ? " is-pk" : ""}`}
-                          aria-hidden
-                        />
-                        <span className="sources-panel__field-name">{field.name}</span>
-                        <span className="sources-panel__field-type">{field.type}</span>
-                        <span className="sources-panel__field-sample">
-                          {sample !== null ? sample : "—"}
-                        </span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </SourceCard>
+          groups.map((group) => (
+            <div className="sources-panel__group" key={group.root.id}>
+              {renderCard(group.root, { nestedCount: group.children.length })}
+              {group.children.length > 0 ? (
+                <div className="sources-panel__nested">
+                  {group.children.map((child) => renderCard(child, { nested: true }))}
+                </div>
+              ) : null}
+            </div>
           ))
         )}
       </div>

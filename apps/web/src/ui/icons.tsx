@@ -87,6 +87,16 @@ export function FileIcon(props: IconProps) {
   );
 }
 
+/** An elbow connector — marks a source unnested from a parent file's array field. */
+export function BranchIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M7 4v9a3 3 0 0 0 3 3h8" />
+      <path d="m15 13 3 3-3 3" />
+    </svg>
+  );
+}
+
 export function ChevronDownIcon(props: IconProps) {
   return (
     <svg {...base(props)}>

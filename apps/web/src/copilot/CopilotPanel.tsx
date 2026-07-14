@@ -17,6 +17,7 @@ import {
   SparkleIcon,
 } from "../ui/icons.js";
 import "./CopilotPanel.css";
+import { afterPaint } from "./afterPaint.js";
 import { Markdown } from "./Markdown.js";
 import { ModelPicker } from "./ModelPicker.js";
 import {
@@ -27,6 +28,7 @@ import {
 import { DEFAULT_MAX_ITERATIONS, type LoopOutcome, runCopilotLoop } from "./agentLoop.js";
 import { buildConversationHistory } from "./conversation.js";
 import { type ChatMessage, nextMessageId } from "./messages.js";
+import { warmDetectorFindings } from "./systemPrompt.js";
 
 /** A note appended to the reply when the loop stopped for a reason other than clean completion. */
 function outcomeFooter(outcome: LoopOutcome, attempts: number): string | null {
@@ -120,8 +122,25 @@ export function CopilotPanel({
   const setSchemaDraft = useSchemaStore((state) => state.setDraft);
   const schemaDraft = useSchemaStore((state) => state.draft);
   const liveTables = useSchemaStore((state) => state.schema.tables);
+  const sources = useSchemaStore((state) => state.sources);
   const messages = useSchemaStore((state) => state.chat);
   const appendChatMessages = useSchemaStore((state) => state.appendChatMessages);
+
+  // The detector pass the system prompt embeds is the copilot's most expensive step (~3.7s on the
+  // real HRSA + OPAIS files) and depends only on the sources. Run it while the user is still
+  // reading the canvas, so the first send doesn't pay for it. Cached by source identity, so this
+  // is a no-op once warm and re-warms whenever a file is added or removed.
+  useEffect(() => {
+    if (sources.length === 0) {
+      return;
+    }
+    if (typeof window.requestIdleCallback !== "function") {
+      const timer = window.setTimeout(() => warmDetectorFindings(sources), 300);
+      return () => window.clearTimeout(timer);
+    }
+    const handle = window.requestIdleCallback(() => warmDetectorFindings(sources));
+    return () => window.cancelIdleCallback(handle);
+  }, [sources]);
 
   // Proposed (ghost) tables not yet in the live schema — surfaced in the Suggestions tab.
   const draftTableCount = schemaDraft
@@ -148,6 +167,9 @@ export function CopilotPanel({
     setBusy(true);
     cancelledRef.current = false;
     scrollToBottom();
+    // Let the optimistic bubble + "Thinking…" paint before propose() builds the prompt (which runs
+    // the detectors synchronously) — otherwise the send click looks like a freeze.
+    await afterPaint();
 
     let attempt = 0;
 
@@ -171,6 +193,7 @@ export function CopilotPanel({
             reply: proposed.reply,
             actions: proposed.actions,
             status: proposed.status ?? "needs_revision",
+            notice: proposed.notice,
           };
         },
         apply: (actions) => {
@@ -194,11 +217,15 @@ export function CopilotPanel({
       const rejectedFinal = last?.rejected ?? [];
       const footer = outcomeFooter(result.outcome, result.steps.length);
       const reply = last?.reply || "(No reply text returned.)";
+      // A provider notice can be raised on any round (the fallback latches on the first), so take
+      // the first one seen rather than only the last step's.
+      const notice = result.steps.find((step) => step.notice)?.notice;
 
       const assistantMessage: ChatMessage = {
         id: nextMessageId(),
         role: "assistant",
         text: footer ? `${reply}\n\n${footer}` : reply,
+        ...(notice ? { notice } : {}),
         ...(appliedAll.length > 0 ? { applied: appliedAll } : {}),
         ...(rejectedFinal.length > 0
           ? {
@@ -237,6 +264,7 @@ export function CopilotPanel({
     setBusy(true);
     cancelledRef.current = false;
     scrollToBottom();
+    await afterPaint();
 
     // Seed the working copy from the live schema (usually empty for a new project). The model
     // proposes against this evolving copy across rounds; the store is never touched here.
@@ -457,6 +485,12 @@ export function CopilotPanel({
                           </span>
                           <div className="copilot-body">
                             <Markdown>{message.text}</Markdown>
+                            {message.notice ? (
+                              <div className="copilot-chip copilot-chip--notice">
+                                <InfoIcon size={15} />
+                                <Markdown>{message.notice}</Markdown>
+                              </div>
+                            ) : null}
                             {message.applied && message.applied.length > 0 ? (
                               <AppliedCard lines={message.applied} />
                             ) : null}
@@ -475,11 +509,21 @@ export function CopilotPanel({
                       );
                     })}
                     {busy ? (
-                      <p className="copilot-status">
-                        {progress && progress.attempt > 1
-                          ? `Working… (step ${progress.attempt}/${progress.max})`
-                          : "Thinking…"}
-                      </p>
+                      <div className="copilot-row copilot-row--assistant">
+                        <span className="copilot-avatar" aria-hidden>
+                          <SparkleIcon size={13} />
+                        </span>
+                        <p className="copilot-status" role="status">
+                          <span className="copilot-status__dots" aria-hidden>
+                            <i />
+                            <i />
+                            <i />
+                          </span>
+                          {progress && progress.attempt > 1
+                            ? `Working… (step ${progress.attempt}/${progress.max})`
+                            : "Thinking…"}
+                        </p>
+                      </div>
                     ) : null}
                     <div ref={chatEndRef} />
                   </div>

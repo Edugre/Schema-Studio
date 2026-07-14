@@ -11,6 +11,8 @@ export type LoopStep = {
   status: CopilotStatus;
   applied: string[];
   rejected: RejectedEntry[];
+  /** Provider-level note about how the turn ran (e.g. local JSON fallback). Usually absent. */
+  notice?: string | undefined;
 };
 
 export type LoopOutcome = "complete" | "blocked" | "stalled" | "exhausted" | "cancelled";
@@ -23,7 +25,12 @@ export type CopilotLoopResult = {
 export type ProposeFn = (
   message: string,
   history: ConversationTurn[],
-) => Promise<{ reply: string; actions: unknown[]; status: CopilotStatus }>;
+) => Promise<{
+  reply: string;
+  actions: unknown[];
+  status: CopilotStatus;
+  notice?: string | undefined;
+}>;
 
 /** Applies actions to the live schema and returns display summaries + rejections. */
 export type ApplyFn = (actions: unknown[]) => { applied: string[]; rejected: RejectedEntry[] };
@@ -86,9 +93,9 @@ export async function runCopilotLoop(params: RunCopilotLoopParams): Promise<Copi
       return { steps, outcome: "cancelled" };
     }
 
-    const { reply, actions, status } = await params.propose(message, history);
+    const { reply, actions, status, notice } = await params.propose(message, history);
     const { applied, rejected } = params.apply(actions);
-    steps.push({ reply, status, applied, rejected });
+    steps.push({ reply, status, applied, rejected, notice });
 
     // Carry this round into the context the next iteration sees.
     history.push({ role: "user", content: message });

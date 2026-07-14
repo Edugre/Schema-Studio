@@ -370,6 +370,25 @@
   flex-shrink: 0;
 }
 
+/* Provider notice (e.g. a local model ran without tool calls). Informational, not a failure —
+   deliberately quieter than the amber "Couldn't apply" chip so it can't be mistaken for one. */
+.copilot-chip--notice {
+  margin-top: 8px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface);
+  color: var(--text-muted);
+}
+
+.copilot-chip--notice svg {
+  flex-shrink: 0;
+  color: var(--text-faint);
+}
+
+.copilot-chip--notice .copilot-markdown {
+  font-size: 12px;
+  line-height: 16px;
+}
+
 /* ---- Markdown body ---- */
 .copilot-markdown {
   white-space: normal;
@@ -447,10 +466,53 @@
 }
 
 .copilot-status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
   margin: 0;
+  padding-top: 3px;
   font-size: 12px;
   color: var(--text-muted);
   font-style: italic;
+}
+
+.copilot-status__dots {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.copilot-status__dots i {
+  width: 5px;
+  height: 5px;
+  border-radius: 9999px;
+  background: var(--text-faint);
+  animation: copilot-blink 1.2s ease-in-out infinite;
+}
+
+.copilot-status__dots i:nth-child(2) {
+  animation-delay: 0.18s;
+}
+
+.copilot-status__dots i:nth-child(3) {
+  animation-delay: 0.36s;
+}
+
+@keyframes copilot-blink {
+  0%,
+  70%,
+  100% {
+    opacity: 0.25;
+  }
+  35% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .copilot-status__dots i {
+    animation: none;
+    opacity: 0.6;
+  }
 }
 
 /* ---- Composer ---- */

@@ -148,7 +148,11 @@ describe("LocalBrowserProvider JSON fallback (models without tool calling)", () 
       reply: "Made an orders table.",
       actions: [{ op: "add_table", name: "orders" }],
       status: "complete",
+      // The fallback is otherwise invisible; the notice is how the user learns this turn ran
+      // without probe_join/inspect_source. It rides beside the reply, never inside it.
+      notice: expect.stringContaining("tool-capable"),
     });
+    expect(result.reply).not.toContain("tool-capable");
     // The retry is a plain completion: no tools, no tool_choice, and it carries the JSON directive.
     expect(calls[1]?.body["tools"]).toBeUndefined();
     expect(calls[1]?.body["tool_choice"]).toBeUndefined();
@@ -181,6 +185,51 @@ describe("LocalBrowserProvider JSON fallback (models without tool calling)", () 
     const result = await new LocalBrowserProvider().propose(EMPTY_SCHEMA, [], "go");
     expect(result.status).toBe("complete");
     expect(result.actions).toEqual([{ op: "add_table", name: "orders" }]);
+  });
+
+  it("raises the fallback notice once per provider, not on every turn", async () => {
+    stubFetch([
+      errorResponse(400, '{"error":"llama2 does not support tools"}'),
+      okResponse({ role: "assistant", content: JSON_REPLY }),
+      okResponse({ role: "assistant", content: JSON_REPLY }),
+    ]);
+
+    const provider = new LocalBrowserProvider("http://localhost:11434/v1", "llama2");
+    const first = await provider.propose(EMPTY_SCHEMA, [], "first");
+    const second = await provider.propose(EMPTY_SCHEMA, [], "second");
+
+    // Repeating it every turn would be nagging — the model hasn't changed, and the user has read it.
+    expect(first.notice).toBeDefined();
+    expect(second.notice).toBeUndefined();
+  });
+
+  it("notices a blocked fallback turn too, so an unparseable reply names the likely cause", async () => {
+    stubFetch([
+      okResponse({ role: "assistant", content: "no tools here" }),
+      // A model too weak to call tools is also the one likely to emit prose where JSON was asked for.
+      okResponse({ role: "assistant", content: "I would probably add a table, I think." }),
+    ]);
+
+    const result = await new LocalBrowserProvider().propose(EMPTY_SCHEMA, [], "make a table");
+
+    expect(result.status).toBe("blocked");
+    expect(result.notice).toContain("tool-capable");
+  });
+
+  it("does not notice a tool-capable model — the strict loop stays silent", async () => {
+    stubFetch([
+      okResponse({
+        role: "assistant",
+        content: null,
+        tool_calls: [
+          toolCall(COPILOT_RESPONSE_TOOL.name, { reply: "ok", actions: [], status: "complete" }),
+        ],
+      }),
+    ]);
+
+    const result = await new LocalBrowserProvider().propose(EMPTY_SCHEMA, [], "make a table");
+
+    expect(result.notice).toBeUndefined();
   });
 
   it("latches a hard tool rejection: later turns skip the doomed tool attempt", async () => {

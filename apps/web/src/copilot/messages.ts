@@ -16,6 +16,12 @@ export const ChatMessageSchema = z.discriminatedUnion("role", [
     text: z.string(),
     applied: z.array(z.string()).optional(),
     rejected: z.array(z.string()).optional(),
+    /**
+     * A provider note about how the turn ran (e.g. a local model without tool calling fell back to
+     * JSON mode). Kept out of `text` so it is never replayed to the model as its own words —
+     * `buildConversationHistory` sends only `text`.
+     */
+    notice: z.string().optional(),
   }),
   z.object({
     id: z.string(),

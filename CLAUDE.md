@@ -61,6 +61,10 @@ manual edits both flow through it.
 - Core logic (parsers, exporters, `applyActions`) requires vitest tests. Don't land core
   changes without them.
 - Keep `packages/core` free of React and of any network/server code.
+- Detectors feeding the copilot prompt must stay **pure functions of `sources`**. The prompt's
+  detector block is expensive (~3.7s on real files) and is cached on source identity and
+  prewarmed on idle in `copilot/systemPrompt.ts` — a detector that reads the schema, the clock,
+  or any other state would silently serve stale findings. Never do that work on the send path.
 
 ## Stack
 

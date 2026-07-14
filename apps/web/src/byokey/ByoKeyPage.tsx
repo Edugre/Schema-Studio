@@ -207,14 +207,27 @@ export function ByoKeyPage({ onClose }: { onClose: () => void }) {
             </p>
 
             {credential.secret ? null : (
-              <div className="byok__trust">
-                <InfoIcon size={16} />
-                <span>
-                  Your browser calls the server directly, so it must allow this origin. For Ollama,
-                  start it with <code>OLLAMA_ORIGINS</code> set to this page’s origin (LM Studio
-                  allows it by default).
-                </span>
-              </div>
+              <>
+                <div className="byok__trust">
+                  <InfoIcon size={16} />
+                  <span>
+                    Your browser calls the server directly, so it must allow this origin. For
+                    Ollama, start it with <code>OLLAMA_ORIGINS</code> set to this page’s origin (LM
+                    Studio allows it by default).
+                  </span>
+                </div>
+                {/* Said here, at the point of choice — by the time a weak model is answering in
+                    chat, the user has already pulled it. */}
+                <div className="byok__trust">
+                  <InfoIcon size={16} />
+                  <span>
+                    Prefer a <strong>tool-capable</strong> model — <code>qwen2.5</code>,{" "}
+                    <code>llama3.1</code>, <code>mistral-nemo</code>. The copilot probes joins and
+                    inspects sample values through tool calls; a model without them still works, but
+                    answers in one pass from the prompt alone and can’t verify what it proposes.
+                  </span>
+                </div>
+              </>
             )}
 
             <label className="byok__remember">
